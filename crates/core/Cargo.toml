@@ -1,0 +1,16 @@
+[package]
+name = "tangibles-chess-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Chess game domain logic for tangibles-chess (rules, sessions, undo plans, autosave)"
+
+[dependencies]
+shakmaty.workspace = true
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

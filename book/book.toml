@@ -1,0 +1,12 @@
+[book]
+title = "tangibles-chess Documentation"
+authors = ["Andreas Schaeffer <hanack@nooblounge.net>"]
+language = "en"
+src = "src"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+git-repository-url = "https://github.com/smearor/tangibles-chess"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]

@@ -1,0 +1,25 @@
+[package]
+name = "tangibles-chess-tangibles"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Tangible input for tangibles-chess: GraphQL client to the tangible-objects daemon, board geometry, move inference"
+
+[dependencies]
+tangibles-chess-core.workspace = true
+shakmaty.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+graphql-ws-client.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+futures.workspace = true
+async-channel.workspace = true
+thiserror.workspace = true
+miette.workspace = true
+tracing.workspace = true
+url.workspace = true

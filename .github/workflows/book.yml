@@ -1,0 +1,26 @@
+name: Book
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "book/**"
+      - ".github/workflows/book.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: VCS Checkout
+        uses: actions/checkout@v7
+      - name: Install mdbook + mermaid preprocessor
+        run: |
+          cargo install mdbook mdbook-mermaid --locked
+      - name: Build book
+        run: mdbook build book
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: book
+          path: book/book

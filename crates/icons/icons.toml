@@ -1,0 +1,40 @@
+# icons.toml - custom icon set for tangibles-chess.
+#
+# Built by fonts_rs_generator::IconSetBuild in build.rs. The whitelist
+# `name` is the upstream SVG file stem; `rename` becomes the exported
+# base name (`tch-<rename>-symbolic`).
+
+[iconset]
+name = "TangiblesChessIcons"
+display_name = "Tangibles Chess Icons"
+icon_prefix = "tch"
+gresource_prefix = "/io/github/smearor/tangibles_chess/icons"
+icons_context = "actions"
+
+[[iconset.sources]]
+crate = "fonts-rs-lucide"
+post_processors = ["symbolic-classes"]
+icons = [
+    "flag",
+    "handshake",
+    "rotate-cw",
+    "rotate-ccw",
+    "undo",
+    "undo-2",
+    "settings",
+    "triangle-alert",
+    "trophy",
+    "timer",
+    "volume-2",
+    "volume-x",
+    "languages",
+    "check",
+    "x",
+    "play",
+    "pause",
+    "circle-dot",
+    "crown",
+    "plus",
+    "wifi",
+    "wifi-off",
+]

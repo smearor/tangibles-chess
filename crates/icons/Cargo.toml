@@ -1,0 +1,29 @@
+[package]
+name = "tangibles-chess-icons"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Custom GTK4 icon set for tangibles-chess, built from fonts-rs family crates via icons.toml"
+
+[features]
+default = ["gtk"]
+gtk = []
+
+[dependencies]
+fonts-rs-generator.workspace = true
+fonts-rs-model.workspace = true
+gio.workspace = true
+gtk4.workspace = true
+phf.workspace = true
+# Iconset sources must be normal dependencies: links metadata (DEP_* env
+# vars) does not propagate via [build-dependencies]. They are never used
+# at runtime - their gresource is unreachable and stripped by the linker.
+fonts-rs-lucide.workspace = true
+fonts-rs-tabler.workspace = true
+
+[build-dependencies]
+fonts-rs-generator.workspace = true
+miette.workspace = true

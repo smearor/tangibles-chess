@@ -1,0 +1,12 @@
+tangibles-chess
+Copyright (c) 2026 Andreas Schaeffer <hanack@nooblounge.net>
+
+This project is licensed under GPL-3.0-or-later (see LICENSE).
+
+Bundled third-party assets and libraries retain their own licenses:
+
+- Chess Cuernavaca font (fonts-rs-cuernavaca): SIL Open Font License 1.1
+- Lucide icons (fonts-rs-lucide): ISC / Lucide license
+- Tabler icons (fonts-rs-tabler): MIT
+- Chess sound set: CC0 (public domain)
+- smearor-wrot-rotation: MIT

@@ -1,0 +1,15 @@
+[package]
+name = "tangibles-chess-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "UCI subprocess client driving external chess engines (stockfish, gnuchess, ...)"
+
+[dependencies]
+tangibles-chess-core.workspace = true
+shakmaty.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

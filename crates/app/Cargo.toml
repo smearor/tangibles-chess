@@ -1,0 +1,36 @@
+[package]
+name = "tangibles-chess"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Tabletop chess for the smart desk: GTK4/libadwaita app with rotatable board, dual-facing controls and tangible-figures mode"
+
+[dependencies]
+tangibles-chess-core.workspace = true
+tangibles-chess-tangibles.workspace = true
+tangibles-chess-engine.workspace = true
+tangibles-chess-icons.workspace = true
+gtk4.workspace = true
+libadwaita.workspace = true
+gio.workspace = true
+glib.workspace = true
+cairo-rs.workspace = true
+gdk4.workspace = true
+smearor-wrot-rotation.workspace = true
+fonts-rs-cuernavaca.workspace = true
+fluent.workspace = true
+fluent-langneg.workspace = true
+unic-langid.workspace = true
+shakmaty.workspace = true
+tokio.workspace = true
+async-channel.workspace = true
+clap.workspace = true
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+miette.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

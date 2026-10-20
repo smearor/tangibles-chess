@@ -1,0 +1,64 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.92"
+version = "0.1.0"
+license = "GPL-3.0-or-later"
+authors = ["Andreas Schaeffer <hanack@nooblounge.net>"]
+repository = "https://github.com/smearor/tangibles-chess"
+homepage = "https://github.com/smearor/tangibles-chess"
+
+[workspace.dependencies]
+# workspace crates
+tangibles-chess-core = { path = "crates/core" }
+tangibles-chess-tangibles = { path = "crates/tangibles" }
+tangibles-chess-engine = { path = "crates/engine" }
+tangibles-chess-icons = { path = "crates/icons" }
+# core
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+thiserror = "2.0"
+miette = "7.6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# chess
+shakmaty = "0.30"
+pgn-reader = "0.27"
+# gtk
+gtk4 = { version = "0.11", features = ["v4_20"] }
+libadwaita = { version = "0.9", features = ["v1_5"] }
+gio = "0.22"
+glib = "0.22"
+cairo-rs = "0.22"
+gdk4 = "0.11"
+smearor-wrot-rotation = "0.2"
+# icons & fonts (git deps until 0.6 is published)
+fonts-rs-generator = { git = "https://github.com/smearor/fonts-rs.git" }
+fonts-rs-model = { git = "https://github.com/smearor/fonts-rs.git" }
+fonts-rs-lucide = { git = "https://github.com/smearor/fonts-rs.git" }
+fonts-rs-tabler = { git = "https://github.com/smearor/fonts-rs.git" }
+fonts-rs-cuernavaca = { git = "https://github.com/smearor/fonts-rs.git" }
+phf = "0.14"
+# i18n
+fluent = "0.16"
+fluent-langneg = "0.13"
+unic-langid = "0.9"
+# async / network
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
+graphql-ws-client = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+futures = "0.3"
+async-channel = "2"
+# misc
+url = "2"
+clap = { version = "4.5", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = "symbols"

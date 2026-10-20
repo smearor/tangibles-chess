@@ -1,0 +1,52 @@
+name: MSRV
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "crates/**/*.rs"
+      - "crates/*/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/msrv.yml"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "crates/**/*.rs"
+      - "crates/*/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/msrv.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    continue-on-error: true
+    steps:
+      - name: VCS Checkout
+        uses: actions/checkout@v7
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libgtk-4-dev libglib2.0-dev libadwaita-1-dev
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: Install cargo msrv
+        uses: taiki-e/cache-cargo-install-action@v3
+        with:
+          tool: cargo-msrv@0.19.3
+      - name: Verify MSRV (tangibles-chess-core)
+        run: cargo msrv --output-format json verify --path crates/core
+      - name: Verify MSRV (tangibles-chess-tangibles)
+        run: cargo msrv --output-format json verify --path crates/tangibles
+      - name: Verify MSRV (tangibles-chess-engine)
+        run: cargo msrv --output-format json verify --path crates/engine
+      - name: Verify MSRV (tangibles-chess-icons)
+        run: cargo msrv --output-format json verify --path crates/icons
+      - name: Verify MSRV (tangibles-chess)
+        run: cargo msrv --output-format json verify --path crates/app

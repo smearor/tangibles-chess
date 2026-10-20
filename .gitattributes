@@ -1,0 +1,5 @@
+book/book/** linguist-generated=true
+
+# Binary assets must not get text normalization.
+assets/** -text
+crates/*/resources/** -text
