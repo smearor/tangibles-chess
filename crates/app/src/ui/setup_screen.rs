@@ -8,6 +8,7 @@ use tangibles_chess_core::BoardTheme;
 use tangibles_chess_core::CommitMode;
 use tangibles_chess_core::GameConfig;
 use tangibles_chess_core::OpponentKind;
+use tangibles_chess_core::SavedGame;
 use tangibles_chess_core::TangibleMode;
 
 use crate::l10n::L10n;
@@ -22,25 +23,58 @@ use crate::ui::dual_facing_row::DualFacingRow;
 pub struct SetupScreen {
     /// Root widget.
     pub widget: gtk4::Box,
+    /// Both facing copies of the tangible-mode selector (for disabling
+    /// when the daemon is unreachable).
+    mode_rows: Rc<RefCell<Vec<adw::ComboRow>>>,
 }
 
 impl SetupScreen {
-    /// Builds the screen; `on_start` fires with the chosen config.
-    pub fn new(initial: GameConfig, l10n: Rc<L10n>, on_start: impl Fn(&GameConfig) + 'static, daemon_available: bool) -> Self {
+    /// Builds the screen; `on_start` fires with the chosen config,
+    /// `on_resume` with a previously autosaved game.
+    pub fn new(
+        initial: GameConfig,
+        saved: Option<SavedGame>,
+        l10n: Rc<L10n>,
+        on_start: impl Fn(&GameConfig) + 'static,
+        on_resume: impl Fn(&SavedGame) + 'static,
+    ) -> Self {
         let config = Rc::new(RefCell::new(initial));
         let on_start = Rc::new(on_start);
+        let on_resume = Rc::new(on_resume);
+        let mode_rows = Rc::new(RefCell::new(Vec::new()));
+        let saved = Rc::new(saved);
 
         let row = DualFacingRow::new({
             let config = config.clone();
             let on_start = on_start.clone();
+            let on_resume = on_resume.clone();
+            let mode_rows = mode_rows.clone();
+            let saved = saved.clone();
             let l10n = l10n.clone();
-            move || Self::build_card(config.clone(), l10n.clone(), on_start.clone(), daemon_available)
+            move || Self::build_card(config.clone(), l10n.clone(), on_start.clone(), on_resume.clone(), mode_rows.clone(), saved.clone())
         });
-        Self { widget: row.widget }
+        Self { widget: row.widget, mode_rows }
+    }
+
+    /// Enables/disables the tangible-mode selectors on both card copies.
+    pub fn set_daemon_available(&self, available: bool, offline_text: &str) {
+        for row in self.mode_rows.borrow().iter() {
+            row.set_sensitive(available);
+            if !available {
+                row.set_subtitle(offline_text);
+            }
+        }
     }
 
     /// One facing half of the setup card.
-    fn build_card(config: Rc<RefCell<GameConfig>>, l10n: Rc<L10n>, on_start: Rc<dyn Fn(&GameConfig)>, daemon_available: bool) -> gtk4::Widget {
+    fn build_card(
+        config: Rc<RefCell<GameConfig>>,
+        l10n: Rc<L10n>,
+        on_start: Rc<dyn Fn(&GameConfig)>,
+        on_resume: Rc<dyn Fn(&SavedGame)>,
+        mode_rows: Rc<RefCell<Vec<adw::ComboRow>>>,
+        saved: Rc<Option<SavedGame>>,
+    ) -> gtk4::Widget {
         let card = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         card.set_halign(gtk4::Align::Center);
         card.set_valign(gtk4::Align::Center);
@@ -79,9 +113,7 @@ impl SetupScreen {
                 };
             }
         });
-        if !daemon_available {
-            mode.set_subtitle(&l10n.msg("daemon-offline"));
-        }
+        mode_rows.borrow_mut().push(mode.clone());
         group.add(&mode);
 
         // Board theme.
@@ -188,6 +220,20 @@ impl SetupScreen {
             on_start(&config);
         });
         card.append(&start);
+
+        if let Some(saved_game) = saved.as_ref() {
+            let resume = gtk4::Button::builder()
+                .label(format!("{} – {} {}", l10n.msg("setup-resume"), saved_game.moves.len(), l10n.msg("setup-resume-moves")))
+                .halign(gtk4::Align::Center)
+                .margin_top(12)
+                .build();
+            resume.add_css_class("pill");
+            resume.set_size_request(360, 64);
+            let saved_game = saved_game.clone();
+            let on_resume = on_resume.clone();
+            resume.connect_clicked(move |_| on_resume(&saved_game));
+            card.append(&resume);
+        }
 
         card.upcast()
     }

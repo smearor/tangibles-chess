@@ -24,6 +24,7 @@ setup-human = Mensch
 setup-engine = Engine
 setup-start = Partie starten
 setup-resume = Partie fortsetzen
+setup-resume-moves = Züge gespielt
 
 # Board-Check / Handshake
 check-heading = Figuren aufstellen

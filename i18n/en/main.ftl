@@ -24,6 +24,7 @@ setup-human = Human
 setup-engine = Engine
 setup-start = Start game
 setup-resume = Resume saved game
+setup-resume-moves = moves played
 
 # Board check / handshake
 check-heading = Place the pieces
