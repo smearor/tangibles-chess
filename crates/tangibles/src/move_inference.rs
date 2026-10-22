@@ -78,7 +78,7 @@ impl MoveInference {
                 FieldEventKind::FieldLifted => self.on_lift(square, position),
                 FieldEventKind::FieldPlaced => self.on_place(square, position),
                 FieldEventKind::FieldCountChanged => self.on_count(square, event.count.unwrap_or(0)),
-                FieldEventKind::Lagged => Vec::new(),
+                FieldEventKind::Lagged | FieldEventKind::Other => Vec::new(),
             }
         } else {
             self.on_zone(field, event)
@@ -228,7 +228,7 @@ impl MoveInference {
                 edge,
                 count: event.count.unwrap_or(0).max(0) as u32,
             })],
-            FieldEventKind::Lagged => Vec::new(),
+            FieldEventKind::Lagged | FieldEventKind::Other => Vec::new(),
         }
     }
 

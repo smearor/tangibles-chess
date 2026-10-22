@@ -1,4 +1,6 @@
 use serde::Deserialize;
+use tangible_objects_model::EventKind;
+use tangible_objects_model::TangibleEvent;
 
 /// Discriminator of an occupancy event from `fieldEvents`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -12,6 +14,9 @@ pub enum FieldEventKind {
     FieldCountChanged,
     /// Subscription lag: events were dropped; resync via `touchPoints`.
     Lagged,
+    /// A non-field event the projection does not consume.
+    #[serde(other)]
+    Other,
 }
 
 /// Flattened payload delivered by the `fieldEvents` subscription.
@@ -28,6 +33,40 @@ pub struct FieldEvent {
     pub count: Option<i32>,
     /// Dropped-event count for `Lagged`.
     pub skipped: Option<i32>,
+}
+
+impl FieldEvent {
+    /// A synthetic lag event (e.g. on a subscription stream error).
+    pub fn lagged(skipped: Option<i32>) -> Self {
+        Self {
+            kind: FieldEventKind::Lagged,
+            field_set: None,
+            field: None,
+            count: None,
+            skipped,
+        }
+    }
+}
+
+impl From<&TangibleEvent> for FieldEvent {
+    /// Projects the full daemon event down to the field-occupancy
+    /// subset this crate consumes.
+    fn from(event: &TangibleEvent) -> Self {
+        let kind = match event.kind {
+            EventKind::FieldPlaced => FieldEventKind::FieldPlaced,
+            EventKind::FieldLifted => FieldEventKind::FieldLifted,
+            EventKind::FieldCountChanged => FieldEventKind::FieldCountChanged,
+            EventKind::Lagged => FieldEventKind::Lagged,
+            _ => FieldEventKind::Other,
+        };
+        Self {
+            kind,
+            field_set: event.field_set.as_ref().map(|name| name.as_str().to_string()),
+            field: event.field.as_ref().map(|name| name.as_str().to_string()),
+            count: event.count.map(|count| count.as_u32() as i32),
+            skipped: event.skipped,
+        }
+    }
 }
 
 #[cfg(test)]

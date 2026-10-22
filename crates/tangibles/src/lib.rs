@@ -14,7 +14,6 @@ mod board_geometry;
 mod daemon_error;
 mod device_info;
 mod field_event;
-mod field_input;
 mod field_set_builder;
 mod graphql_source;
 mod inference_output;
@@ -33,9 +32,7 @@ pub use daemon_error::DaemonError;
 pub use device_info::DeviceInfo;
 pub use field_event::FieldEvent;
 pub use field_event::FieldEventKind;
-pub use field_input::FieldInput;
 pub use field_set_builder::FieldSetBuilder;
-pub use field_set_builder::FieldSetSpec;
 pub use graphql_source::GraphQlSource;
 pub use inference_output::InferenceOutput;
 pub use mock_source::MockSource;
@@ -48,6 +45,10 @@ pub use tangible_source::TangibleSource;
 pub use touch_point::ContactPos;
 pub use touch_point::TouchPoint;
 pub use zone_action::ZoneAction;
+
+/// The daemon's field-set domain type, re-exported so callers do not
+/// have to depend on `tangible-objects-model` directly.
+pub use tangible_objects_model::FieldSet;
 
 /// Field set name registered with the daemon for chess.
 pub const FIELD_SET_NAME: &str = "chess";

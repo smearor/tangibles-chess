@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use tangible_objects_model::FieldSet;
+
 use crate::DaemonError;
 use crate::DeviceInfo;
 use crate::FieldEvent;
-use crate::FieldSetSpec;
 use crate::TangibleSource;
 use crate::TouchPoint;
 
@@ -20,7 +21,7 @@ pub struct MockSource {
     /// Device calibration returned by `device_info`.
     device: DeviceInfo,
     /// Field set registrations observed, for test assertions.
-    pub registered: Arc<Mutex<Vec<FieldSetSpec>>>,
+    pub registered: Arc<Mutex<Vec<FieldSet>>>,
 }
 
 impl Default for MockSource {
@@ -83,7 +84,7 @@ impl TangibleSource for MockSource {
         Ok(Vec::new())
     }
 
-    async fn register_field_set(&self, spec: &FieldSetSpec) -> Result<(), DaemonError> {
+    async fn register_field_set(&self, spec: &FieldSet) -> Result<(), DaemonError> {
         self.registered
             .lock()
             .map_err(|_| DaemonError::Unavailable("mock lock poisoned".to_string()))?

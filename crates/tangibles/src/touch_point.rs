@@ -20,3 +20,17 @@ pub struct TouchPoint {
     /// Contact position.
     pub pos: ContactPos,
 }
+
+impl From<&tangible_objects_model::TouchPoint> for TouchPoint {
+    /// Projects the upstream model type into our plain-value mirror.
+    fn from(point: &tangible_objects_model::TouchPoint) -> Self {
+        Self {
+            slot: point.slot.as_u32(),
+            tracking_id: point.tracking_id.as_i32() as i64,
+            pos: ContactPos {
+                x: point.pos.x,
+                y: point.pos.y,
+            },
+        }
+    }
+}

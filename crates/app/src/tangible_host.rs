@@ -30,7 +30,7 @@ impl TangibleHost {
     }
 
     /// Registers the chess field set on the daemon.
-    pub fn register(&self, source: &GraphQlSource, spec: &tangibles_chess_tangibles::FieldSetSpec) -> Result<(), DaemonError> {
+    pub fn register(&self, source: &GraphQlSource, spec: &tangibles_chess_tangibles::FieldSet) -> Result<(), DaemonError> {
         self.runtime.block_on(source.register_field_set(spec))
     }
 

@@ -31,6 +31,21 @@ impl DeviceInfo {
     }
 }
 
+impl From<tangible_objects_model::DeviceInfo> for DeviceInfo {
+    /// Projects the upstream model type into our plain-f64 mirror.
+    fn from(info: tangible_objects_model::DeviceInfo) -> Self {
+        Self {
+            name: info.name,
+            x_res: info.x_res.map(|v| v.as_f64()),
+            y_res: info.y_res.map(|v| v.as_f64()),
+            x_min: info.x_min.map(|v| v.as_f64()),
+            x_max: info.x_max.map(|v| v.as_f64()),
+            y_min: info.y_min.map(|v| v.as_f64()),
+            y_max: info.y_max.map(|v| v.as_f64()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::DeviceInfo;

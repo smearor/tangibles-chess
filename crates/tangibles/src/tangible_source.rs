@@ -1,9 +1,10 @@
 use std::future::Future;
 
+use tangible_objects_model::FieldSet;
+
 use crate::DaemonError;
 use crate::DeviceInfo;
 use crate::FieldEvent;
-use crate::FieldSetSpec;
 use crate::TouchPoint;
 
 /// A source of tangible-object state, backed either by the daemon's
@@ -23,7 +24,7 @@ pub trait TangibleSource: Send + Sync {
     fn touch_points(&self) -> impl Future<Output = Result<Vec<TouchPoint>, DaemonError>> + Send;
 
     /// Registers the chess field set (`registerFieldSet` mutation).
-    fn register_field_set(&self, spec: &FieldSetSpec) -> impl Future<Output = Result<(), DaemonError>> + Send;
+    fn register_field_set(&self, spec: &FieldSet) -> impl Future<Output = Result<(), DaemonError>> + Send;
 
     /// Removes this app's registrations (`unregisterOwner` mutation).
     fn unregister(&self) -> impl Future<Output = Result<(), DaemonError>> + Send;

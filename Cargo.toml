@@ -47,12 +47,12 @@ phf = "0.14"
 fluent = "0.16"
 fluent-langneg = "0.13"
 unic-langid = "0.9"
+# tangible-objects daemon (typed GraphQL client, upstream)
+tangible-objects-client = { git = "https://github.com/smearor/tangible-objects-rs.git" }
+tangible-objects-model = { git = "https://github.com/smearor/tangible-objects-rs.git" }
 # async / network
 tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
-graphql-ws-client = "0.4"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
-futures = "0.3"
+futures-lite = "2"
 async-channel = "2"
 # misc
 url = "2"

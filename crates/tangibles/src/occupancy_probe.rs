@@ -33,7 +33,7 @@ impl OccupancyProbe {
             FieldEventKind::FieldPlaced => true,
             FieldEventKind::FieldLifted => false,
             FieldEventKind::FieldCountChanged => event.count.unwrap_or(0) > 0,
-            FieldEventKind::Lagged => return,
+            FieldEventKind::Lagged | FieldEventKind::Other => return,
         };
         if let Some(index) = BoardGeometry::field_index(field) {
             if occupied {

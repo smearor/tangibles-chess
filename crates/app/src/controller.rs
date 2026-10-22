@@ -210,7 +210,7 @@ impl GameController {
 
     /// Computes the board rect in screen millimeters and builds the
     /// field set registration.
-    fn build_field_set(&mut self, source: &GraphQlSource) -> tangibles_chess_tangibles::FieldSetSpec {
+    fn build_field_set(&mut self, source: &GraphQlSource) -> tangibles_chess_tangibles::FieldSet {
         // Window size in screen mm comes from the device calibration;
         // the board rect in mm is the rendered board rect scaled by
         // mm-per-pixel of the panel.
@@ -235,7 +235,7 @@ impl GameController {
     }
 
     /// Registers the field set through the host runtime.
-    fn register(&self, spec: tangibles_chess_tangibles::FieldSetSpec, source: &GraphQlSource) -> Result<(), tangibles_chess_tangibles::DaemonError> {
+    fn register(&self, spec: tangibles_chess_tangibles::FieldSet, source: &GraphQlSource) -> Result<(), tangibles_chess_tangibles::DaemonError> {
         self.host
             .as_ref()
             .ok_or_else(|| tangibles_chess_tangibles::DaemonError::Unavailable("no host".to_string()))?
