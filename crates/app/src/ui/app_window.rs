@@ -128,14 +128,7 @@ impl AppWindow {
     }
 
     /// Creates the session + screen + controller for a new or resumed game.
-    fn start_game(
-        stack: &gtk4::Stack,
-        config: GameConfig,
-        saved: Option<SavedGame>,
-        mut settings: AppSettings,
-        l10n: Rc<L10n>,
-        mock: bool,
-    ) {
+    fn start_game(stack: &gtk4::Stack, config: GameConfig, saved: Option<SavedGame>, mut settings: AppSettings, l10n: Rc<L10n>, mock: bool) {
         settings.last_config = config.clone();
         settings.sound_enabled = config.sound_enabled;
         settings.save();

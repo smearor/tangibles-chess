@@ -143,18 +143,23 @@ pub fn spawn_http(tx: async_channel::Sender<GameRequest>, addr: SocketAddr) -> s
             }
         };
         runtime.block_on(async move {
-            let allowed_hosts = [
-                "localhost".to_string(),
-                "127.0.0.1".to_string(),
-                "::1".to_string(),
-                addr.ip().to_string(),
-                addr.to_string(),
-            ];
-            let service = StreamableHttpService::new(
-                move || Ok(ChessMcp { tx: tx.clone() }),
-                Arc::new(LocalSessionManager::default()),
-                StreamableHttpServerConfig::default().with_allowed_hosts(allowed_hosts),
-            );
+            // Host validation: a wildcard bind cannot predict which LAN
+            // address clients connect through, so the allowlist is
+            // disabled there. A concrete bind restricts the list to
+            // loopback plus the bound address itself.
+            let config = if addr.ip().is_unspecified() {
+                StreamableHttpServerConfig::default().disable_allowed_hosts()
+            } else {
+                let allowed_hosts = [
+                    "localhost".to_string(),
+                    "127.0.0.1".to_string(),
+                    "::1".to_string(),
+                    addr.ip().to_string(),
+                    addr.to_string(),
+                ];
+                StreamableHttpServerConfig::default().with_allowed_hosts(allowed_hosts)
+            };
+            let service = StreamableHttpService::new(move || Ok(ChessMcp { tx: tx.clone() }), Arc::new(LocalSessionManager::default()), config);
             let app = axum::Router::new().route_service("/mcp", service);
             let listener = match tokio::net::TcpListener::bind(addr).await {
                 Ok(listener) => listener,
