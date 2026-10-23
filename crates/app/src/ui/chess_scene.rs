@@ -98,8 +98,11 @@ mod imp {
     impl ObjectImpl for ChessSceneImp {}
 
     impl WidgetImpl for ChessSceneImp {
+        /// (minimum, natural, min_baseline, nat_baseline): a small
+        /// natural request - the tabletop must fit the window, never
+        /// drive its size; vexpand distributes the surplus.
         fn measure(&self, _orientation: gtk4::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
-            (800, -1, 1600, -1)
+            (200, 400, -1, -1)
         }
 
         fn snapshot(&self, snapshot: &gtk4::Snapshot) {
@@ -116,6 +119,8 @@ mod imp {
             let palette = ThemePalette::of(state.theme);
 
             // Board frame (the material border with coordinate inlay).
+            // append_cairo clips to the given bounds but the context
+            // itself draws in widget coordinates.
             let frame = snapshot.append_cairo(&graphene::Rect::new(
                 (bx - bs * 0.045) as f32,
                 (by - bs * 0.045) as f32,
@@ -123,7 +128,7 @@ mod imp {
                 (bs * 1.09) as f32,
             ));
             frame.set_source_rgb(palette.frame.0, palette.frame.1, palette.frame.2);
-            frame.rectangle(0.0, 0.0, bs * 1.09, bs * 1.09);
+            frame.rectangle(bx - bs * 0.045, by - bs * 0.045, bs * 1.09, bs * 1.09);
             let _ = frame.fill();
 
             let squares = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
@@ -131,8 +136,8 @@ mod imp {
                 let (row, col) = (scene / 8, scene % 8);
                 let square = scene_square(scene);
                 let base = if (row + col) % 2 == 0 { palette.light } else { palette.dark };
-                let x = col as f64 * cell;
-                let y = row as f64 * cell;
+                let x = bx + col as f64 * cell;
+                let y = by + row as f64 * cell;
                 squares.set_source_rgb(base.0, base.1, base.2);
                 squares.rectangle(x, y, cell, cell);
                 let _ = squares.fill();
@@ -178,18 +183,18 @@ mod imp {
             squares.set_font_size(font);
             for col in 0..8usize {
                 let letter = (b'a' + col as u8) as char;
-                let x = col as f64 * cell + cell * 0.06;
-                squares.move_to(x, font * 0.95);
+                let x = bx + col as f64 * cell + cell * 0.06;
+                squares.move_to(x, by + font * 0.95);
                 let _ = squares.show_text(&letter.to_string());
-                squares.move_to(x, bs - font * 0.15);
+                squares.move_to(x, by + bs - font * 0.15);
                 let _ = squares.show_text(&letter.to_string());
             }
             for row in 0..8usize {
                 let rank = (8 - row).to_string();
-                let y = row as f64 * cell + cell * 0.72;
-                squares.move_to(font * 0.15, y);
+                let y = by + row as f64 * cell + cell * 0.72;
+                squares.move_to(bx + font * 0.15, y);
                 let _ = squares.show_text(&rank);
-                squares.move_to(bs - font * 0.65, y);
+                squares.move_to(bx + bs - font * 0.65, y);
                 let _ = squares.show_text(&rank);
             }
 

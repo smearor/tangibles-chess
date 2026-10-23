@@ -3,3 +3,4 @@ Cargo.lock.bk
 *.profraw
 .idea/
 book/book/
+screenshots/

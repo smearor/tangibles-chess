@@ -35,7 +35,6 @@ impl AppWindow {
             .title(l10n.msg("app-title"))
             .default_width(-1)
             .default_height(-1)
-            .fullscreened(true)
             .build();
 
         let stack = gtk4::Stack::new();
@@ -71,7 +70,14 @@ impl AppWindow {
                 }
             },
         ));
-        stack.add_named(&setup.widget, Some("setup"));
+        // The dual-facing setup page is tall by design (one card per
+        // table edge); a scroll viewport keeps it usable on monitors
+        // that are smaller than its natural height.
+        let setup_scroll = gtk4::ScrolledWindow::new();
+        setup_scroll.set_child(Some(&setup.widget));
+        setup_scroll.set_hscrollbar_policy(gtk4::PolicyType::Never);
+        setup_scroll.set_propagate_natural_height(false);
+        stack.add_named(&setup_scroll, Some("setup"));
         window.set_content(Some(&stack));
 
         // Probe the daemon's TCP reachability on a helper thread; the
@@ -89,6 +95,19 @@ impl AppWindow {
                 setup_probe.set_daemon_available(false, &l10n_probe.msg("daemon-offline"));
             }
         });
+
+        // Debug shortcut: TANGIBLES_DEBUG_GAME=1 skips the setup screen
+        // and starts a game with the current config immediately.
+        if std::env::var("TANGIBLES_DEBUG_GAME").is_ok() {
+            let stack = stack.clone();
+            let settings = settings.clone();
+            let l10n = l10n.clone();
+            let saved = saved.clone();
+            glib::idle_add_local_once(move || {
+                let saved_game = saved.clone();
+                Self::start_game(&stack, settings.last_config.clone(), saved_game, settings.clone(), l10n.clone(), mock);
+            });
+        }
 
         Self { window }
     }

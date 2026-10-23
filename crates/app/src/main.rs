@@ -72,6 +72,12 @@ fn main() -> glib::ExitCode {
         install_css();
         let window = AppWindow::new(app, settings.clone(), l10n.clone(), args.mock);
         window.window.present();
+        if std::env::var_os("TANGIBLES_NO_FULLSCREEN").is_none() {
+            // Fullscreen must be requested once the window is presented;
+            // before that the content's natural size can overshoot the
+            // monitor and the compositor clamps it visually.
+            window.window.fullscreen();
+        }
     });
 
     application.run()
