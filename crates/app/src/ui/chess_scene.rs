@@ -295,16 +295,29 @@ impl ChessScene {
         board_rect(self.width() as f64, self.height() as f64)
     }
 
-    /// The board rectangle converted to screen millimeters, using the
-    /// widget's position inside the window.
+    /// The board rectangle converted to screen millimeters.
+    ///
+    /// Maps all four board corners through the widget transform into
+    /// window coordinates and takes the axis-aligned bounding box - this
+    /// stays correct while the surface sits rotated inside the
+    /// `RotationWidget`, where a naive `(0,0)` lookup would report the
+    /// corner's transformed position instead of the board's coverage.
     pub fn board_rect_mm(&self, mm_per_px: f64) -> Option<(f64, f64, f64)> {
         let (bx, by, bs) = self.board_rect()?;
         let root = self.root()?;
-        let (ox, oy) = self
-            .compute_point(&root, &graphene::Point::new(0.0, 0.0))
-            .map(|point| (point.x() as f64, point.y() as f64))
-            .unwrap_or((0.0, 0.0));
-        Some(((bx + ox) * mm_per_px, (by + oy) * mm_per_px, bs * mm_per_px))
+        let mut min_x = f64::MAX;
+        let mut min_y = f64::MAX;
+        let mut max_x = f64::MIN;
+        let mut max_y = f64::MIN;
+        for (px, py) in [(bx, by), (bx + bs, by), (bx, by + bs), (bx + bs, by + bs)] {
+            let point = self.compute_point(&root, &graphene::Point::new(px as f32, py as f32))?;
+            min_x = min_x.min(point.x() as f64);
+            min_y = min_y.min(point.y() as f64);
+            max_x = max_x.max(point.x() as f64);
+            max_y = max_y.max(point.y() as f64);
+        }
+        let side = ((max_x - min_x).min(max_y - min_y)) * mm_per_px;
+        Some((min_x * mm_per_px, min_y * mm_per_px, side))
     }
 
     /// Maps a scene-space point to a square.

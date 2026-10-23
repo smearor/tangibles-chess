@@ -251,7 +251,12 @@ impl GameController {
             };
             let source = source.clone();
             let spec = controller_ref.build_field_set(&source);
-            let result = controller_ref.host.as_ref().map(|host| host.register(&source, &spec));
+            let result = controller_ref.host.as_ref().map(|host| {
+                // A previous registration (stale session, re-register
+                // after rotation) would collide on the set name.
+                let _ = host.unregister(&source);
+                host.register(&source, &spec)
+            });
             match result {
                 Some(Ok(())) => {
                     info!("field set registered");
@@ -696,6 +701,11 @@ impl GameController {
             return;
         }
         self.screen.rotate_step(clockwise);
+        // The physical field mapping follows the rotated board - re-register
+        // once the rotation animation has settled.
+        glib::timeout_add_local_once(std::time::Duration::from_millis(600), || {
+            with_controller(|controller| Self::register_when_ready(controller.clone()));
+        });
         self.geometry = BoardGeometry::new(self.screen.orientation(), self.geometry.white_edge());
         self.inference = MoveInference::new(self.geometry, self.session.config().commit_mode);
         self.gate = PlacementGate::new(self.geometry);
