@@ -1,6 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gdk4::prelude::DisplayExt;
+use gdk4::prelude::MonitorExt;
+use gdk4::prelude::SurfaceExt;
+use gtk4::prelude::NativeExt;
 use gtk4::prelude::WidgetExt;
 use shakmaty::Color;
 use shakmaty::KnownOutcome;
@@ -207,21 +211,53 @@ impl GameController {
             match result {
                 Some((host, source)) => {
                     controller.borrow_mut().host = Some(host);
-                    let spec = controller.borrow_mut().build_field_set(&source);
-                    if let Err(err) = controller.borrow().register(spec, &source) {
-                        warn!("field set registration failed: {err}");
-                        return;
-                    }
                     Self::start_event_pump(controller.clone(), source.events());
                     controller.borrow_mut().source = Some(Source::Daemon(Rc::new(source)));
                     controller.borrow_mut().sync_scene();
-                    info!("tangible daemon connected and field set registered");
+                    info!("tangible daemon connected");
+                    Self::register_when_ready(controller.clone());
                 }
                 None => {
                     controller.borrow().screen.daemon_banner.set_revealed(true);
                     warn!("daemon connection failed");
                 }
             }
+        });
+    }
+
+    /// Registers the chess field set once the scene has a real
+    /// allocation - before that, `board_rect_mm` has nothing to scale
+    /// and would register a degenerate board. Polls a few times, then
+    /// logs and gives up.
+    fn register_when_ready(controller: Rc<RefCell<Self>>) {
+        let mut tries = 0u8;
+        glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+            tries += 1;
+            let ready = controller.borrow().screen.surface.scene.board_rect().is_some();
+            if !ready {
+                return if tries < 50 {
+                    glib::ControlFlow::Continue
+                } else {
+                    warn!("field set registration skipped: scene never realized");
+                    glib::ControlFlow::Break
+                };
+            }
+            let mut controller_ref = controller.borrow_mut();
+            let Some(Source::Daemon(source)) = &controller_ref.source else {
+                return glib::ControlFlow::Break;
+            };
+            let source = source.clone();
+            let spec = controller_ref.build_field_set(&source);
+            let result = controller_ref.host.as_ref().map(|host| host.register(&source, &spec));
+            match result {
+                Some(Ok(())) => {
+                    info!("field set registered");
+                    controller_ref.update_placement();
+                }
+                Some(Err(err)) => warn!("field set registration failed: {err}"),
+                None => warn!("field set registration skipped: no tangible host"),
+            }
+            glib::ControlFlow::Break
         });
     }
 
@@ -370,33 +406,37 @@ impl GameController {
     fn build_field_set(&mut self, source: &GraphQlSource) -> tangibles_chess_tangibles::FieldSet {
         // Window size in screen mm comes from the device calibration;
         // the board rect in mm is the rendered board rect scaled by
-        // mm-per-pixel of the panel.
+        // mm-per-pixel of the panel. The px denominator is the monitor
+        // geometry - the app runs fullscreen on the desk surface - not
+        // the widget size, which can lag behind layout or diverge.
         let Some(host) = &self.host else {
             return FieldSetBuilder::new((0.0, 0.0, 100.0), (100.0, 100.0)).build();
         };
         let info = host.device_info(source).unwrap_or_default();
         let (screen_w_mm, screen_h_mm) = info.screen_mm().unwrap_or((1000.0, 600.0));
-        let widget_w = self.screen.widget.width().max(1) as f64;
-        let widget_h = self.screen.widget.height().max(1) as f64;
-        let mm_per_px_x = screen_w_mm / widget_w;
-        let mm_per_px_y = screen_h_mm / widget_h;
+        let (panel_w, panel_h) = self
+            .panel_px()
+            .unwrap_or_else(|| (self.screen.widget.width().max(1) as f64, self.screen.widget.height().max(1) as f64));
+        let mm_per_px_x = screen_w_mm / panel_w;
+        let mm_per_px_y = screen_h_mm / panel_h;
         let mm_per_px = (mm_per_px_x + mm_per_px_y) / 2.0;
         if let Some((bx, by, bs)) = self.screen.surface.scene.board_rect_mm(mm_per_px) {
             self.board_mm = (bx, by, bs);
         } else {
             // Scene not realized yet: approximate with a centered square.
-            let side = widget_w.min(widget_h) * 0.88 * mm_per_px;
+            let side = panel_w.min(panel_h) * 0.88 * mm_per_px;
             self.board_mm = ((screen_w_mm - side) / 2.0, (screen_h_mm - side) / 2.0, side);
         }
         FieldSetBuilder::new(self.board_mm, (screen_w_mm, screen_h_mm)).build()
     }
 
-    /// Registers the field set through the host runtime.
-    fn register(&self, spec: tangibles_chess_tangibles::FieldSet, source: &GraphQlSource) -> Result<(), tangibles_chess_tangibles::DaemonError> {
-        self.host
-            .as_ref()
-            .ok_or_else(|| tangibles_chess_tangibles::DaemonError::Unavailable("no host".to_string()))?
-            .register(source, &spec)
+    /// The monitor's pixel size that hosts our surface - the panel the
+    /// touch coordinates are calibrated against.
+    fn panel_px(&self) -> Option<(f64, f64)> {
+        let surface = self.screen.widget.native()?.surface()?;
+        let monitor = surface.display().monitor_at_surface(&surface)?;
+        let geom = monitor.geometry();
+        Some((geom.width() as f64, geom.height() as f64))
     }
 
     /// One field event from the daemon.
