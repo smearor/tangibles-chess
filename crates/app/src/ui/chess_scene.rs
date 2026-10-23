@@ -233,6 +233,14 @@ mod imp {
                     };
                     snapshot.save();
                     snapshot.translate(&graphene::Point::new(x as f32, y as f32));
+                    if piece.color == shakmaty::Color::Black {
+                        // The north player faces their own pieces: flip
+                        // black glyphs around the cell centre so they are
+                        // readable upside down.
+                        snapshot.translate(&graphene::Point::new((cell / 2.0) as f32, (cell / 2.0) as f32));
+                        snapshot.rotate(180.0);
+                        snapshot.translate(&graphene::Point::new((-cell / 2.0) as f32, (-cell / 2.0) as f32));
+                    }
                     paintable.snapshot(snapshot, cell, cell);
                     snapshot.restore();
                 }
