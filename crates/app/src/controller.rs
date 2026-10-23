@@ -512,6 +512,19 @@ impl GameController {
         }
     }
 
+    /// Releases this app's daemon registrations (the chess field set) -
+    /// called on shutdown so the daemon drops the occupancy zones
+    /// instead of keeping a stale `chess` set alive.
+    pub fn release_registrations(&mut self) {
+        let (Some(host), Some(Source::Daemon(source))) = (&self.host, &self.source) else {
+            return;
+        };
+        match host.unregister(source) {
+            Ok(()) => info!("field set unregistered"),
+            Err(err) => warn!("unregister failed: {err}"),
+        }
+    }
+
     /// Re-queries touch points after a lagged subscription.
     fn resync_occupancy(&mut self) {
         let touches = match (&self.host, &self.source) {

@@ -43,4 +43,10 @@ impl TangibleHost {
     pub fn touch_points(&self, source: &GraphQlSource) -> Result<Vec<tangibles_chess_tangibles::TouchPoint>, DaemonError> {
         self.runtime.block_on(source.touch_points())
     }
+
+    /// Removes this app's registrations on the daemon - the field set
+    /// and every resource it owns.
+    pub fn unregister(&self, source: &GraphQlSource) -> Result<(), DaemonError> {
+        self.runtime.block_on(source.unregister())
+    }
 }

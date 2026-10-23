@@ -26,6 +26,7 @@ thiserror = "2.0"
 miette = "7.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+signal-hook = "0.3"
 # chess
 shakmaty = "0.30"
 pgn-reader = "0.27"

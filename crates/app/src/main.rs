@@ -74,6 +74,7 @@ fn main() -> glib::ExitCode {
             }
         }
         install_css();
+        install_shutdown_handlers(app);
         let window = AppWindow::new(app, settings.clone(), l10n.clone(), args.mock, args.mcp_listen);
         window.window.present();
         if std::env::var_os("TANGIBLES_NO_FULLSCREEN").is_none() {
@@ -87,6 +88,36 @@ fn main() -> glib::ExitCode {
     // `run()` would feed argv to GTK's own option parser, which rejects
     // our flags; clap already consumed them.
     application.run_with_args(&["tangibles-chess"])
+}
+
+/// Releases the daemon field-set registration on SIGINT/SIGTERM and
+/// then quits the app, so a Ctrl+C on the desk does not leave a stale
+/// `chess` set registered. `signal-hook` feeds the signals into a
+/// channel; the actual cleanup runs on the glib main loop where the
+/// controller lives.
+fn install_shutdown_handlers(app: &adw::Application) {
+    let (tx, rx) = async_channel::unbounded::<()>();
+    std::thread::spawn(move || {
+        let mut signals = match signal_hook::iterator::Signals::new([signal_hook::consts::SIGINT, signal_hook::consts::SIGTERM]) {
+            Ok(signals) => signals,
+            Err(err) => {
+                tracing::warn!("signal handler install failed: {err}");
+                return;
+            }
+        };
+        if signals.forever().next().is_some() {
+            let _ = tx.send_blocking(());
+        }
+    });
+    let app = app.clone();
+    glib::MainContext::default().spawn_local(async move {
+        if rx.recv().await.is_ok() {
+            crate::controller::with_controller(|controller| {
+                controller.borrow_mut().release_registrations();
+            });
+            app.quit();
+        }
+    });
 }
 
 /// Registers the application stylesheet.
