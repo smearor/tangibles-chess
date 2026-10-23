@@ -131,6 +131,33 @@ mod imp {
             frame.rectangle(bx - bs * 0.045, by - bs * 0.045, bs * 1.09, bs * 1.09);
             let _ = frame.fill();
 
+            // Coordinate inlay engraved into the frame: ranks run on
+            // both vertical edges (left upright for the south player,
+            // right rotated 180° for the north player); files on the
+            // bottom edge upright and on the top edge rotated, so each
+            // player reads the labels on their own side.
+            let muted = (
+                (palette.light.0 + palette.frame.0) / 2.0 + 0.08,
+                (palette.light.1 + palette.frame.1) / 2.0 + 0.08,
+                (palette.light.2 + palette.frame.2) / 2.0 + 0.08,
+            );
+            frame.set_source_rgb(muted.0, muted.1, muted.2);
+            let margin = bs * 0.045;
+            let font = margin * 0.55;
+            frame.set_font_size(font);
+            for row in 0..8usize {
+                let rank = (8 - row).to_string();
+                let cy = by + row as f64 * cell + cell / 2.0;
+                text_centered(&frame, &rank, bx - margin / 2.0, cy, 0.0);
+                text_centered(&frame, &rank, bx + bs + margin / 2.0, cy, std::f64::consts::PI);
+            }
+            for col in 0..8usize {
+                let letter = ((b'a' + col as u8) as char).to_string();
+                let cx = bx + col as f64 * cell + cell / 2.0;
+                text_centered(&frame, &letter, cx, by + bs + margin / 2.0, 0.0);
+                text_centered(&frame, &letter, cx, by - margin / 2.0, std::f64::consts::PI);
+            }
+
             let squares = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
             for scene in 0..64usize {
                 let (row, col) = (scene / 8, scene % 8);
@@ -170,32 +197,6 @@ mod imp {
                 if state.ghost.is_some_and(|(_, to)| to == square) {
                     ring_highlight(&squares, x, y, cell, palette.ceremony);
                 }
-            }
-
-            // Coordinate inlay: file letters top+bottom, ranks left+right,
-            // engraved into the frame in muted tone.
-            squares.set_source_rgb(
-                (palette.light.0 + palette.frame.0) / 2.0 + 0.08,
-                (palette.light.1 + palette.frame.1) / 2.0 + 0.08,
-                (palette.light.2 + palette.frame.2) / 2.0 + 0.08,
-            );
-            let font = cell * 0.30;
-            squares.set_font_size(font);
-            for col in 0..8usize {
-                let letter = (b'a' + col as u8) as char;
-                let x = bx + col as f64 * cell + cell * 0.06;
-                squares.move_to(x, by + font * 0.95);
-                let _ = squares.show_text(&letter.to_string());
-                squares.move_to(x, by + bs - font * 0.15);
-                let _ = squares.show_text(&letter.to_string());
-            }
-            for row in 0..8usize {
-                let rank = (8 - row).to_string();
-                let y = by + row as f64 * cell + cell * 0.72;
-                squares.move_to(bx + font * 0.15, y);
-                let _ = squares.show_text(&rank);
-                squares.move_to(bx + bs - font * 0.65, y);
-                let _ = squares.show_text(&rank);
             }
 
             // Piece layer.
@@ -353,4 +354,19 @@ fn target_dot(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: (f64,
     let center = cell / 2.0;
     cr.arc(x + center, y + center, cell * 0.16, 0.0, std::f64::consts::TAU);
     let _ = cr.fill();
+}
+
+/// Draws `text` centered on `(x, y)`, rotated by `angle` radians.
+///
+/// Used for the frame inlay so the north-edge labels are readable by
+/// the player sitting opposite.
+fn text_centered(cr: &gtk4::cairo::Context, text: &str, x: f64, y: f64, angle: f64) {
+    if let Ok(extents) = cr.text_extents(text) {
+        let _ = cr.save();
+        cr.translate(x, y);
+        cr.rotate(angle);
+        cr.move_to(-(extents.x_bearing() + extents.width() / 2.0), -(extents.y_bearing() + extents.height() / 2.0));
+        let _ = cr.show_text(text);
+        let _ = cr.restore();
+    }
 }
