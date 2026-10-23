@@ -46,9 +46,16 @@ impl FieldSetBuilder {
 
     /// Builds the full field set: 64 board cells + 2 confirm zones +
     /// 2 captured trays, suppressing marker contacts from the OS.
+    ///
+    /// Disjointness is structural: the confirm zone and tray on each
+    /// side split the free strip between the board edge and the surface
+    /// edge without gaps or clamps that could invert a region. A board
+    /// that would poke past the surface is shrunk to fit first, since
+    /// any overflow row would overlap the degenerate edge zones.
     pub fn build(&self) -> FieldSet {
         let (bx, by, bs) = self.board_mm;
-        let (_, wh) = self.window_mm;
+        let (ww, wh) = self.window_mm;
+        let bs = bs.min(ww - bx).min(wh - by).max(0.0);
         let cell = bs / 8.0;
         let mut fields = Vec::with_capacity(64 + 4);
         for index in 0..64 {
@@ -62,14 +69,25 @@ impl FieldSetBuilder {
             ));
         }
         let zone = self.zone_mm;
-        // Confirm zones: strips just beyond the south/north board edges.
-        fields.push(Self::field(crate::ZONE_BTN_SOUTH, bx + bs * 0.35, by + bs + 4.0, bx + bs * 0.65, by + bs + 4.0 + zone));
-        fields.push(Self::field(crate::ZONE_BTN_NORTH, bx + bs * 0.35, (by - 4.0 - zone).max(0.0), bx + bs * 0.65, by - 4.0));
-        // Captured-piece trays along the south/north edges, past the
-        // confirm zones. Screen-bound clamps only - the daemon rejects
-        // overlapping fields (`FieldSet::is_disjoint`).
-        fields.push(Self::field(crate::ZONE_TRAY_SOUTH, bx, (by + bs + 4.0 + zone).min(wh), bx + bs, wh));
-        fields.push(Self::field(crate::ZONE_TRAY_NORTH, bx, 0.0, bx + bs, (by - 4.0 - zone).max(0.0)));
+        // South side: confirm strip directly below the board, tray takes
+        // the rest down to the surface edge. When the free strip is
+        // shorter than `zone`, the tray collapses to the empty region at
+        // `wh` - a zero-height region never overlaps.
+        let south_top = by + bs + 4.0;
+        let south_confirm_h = (wh - south_top).max(0.0).min(zone);
+        fields.push(Self::field(crate::ZONE_BTN_SOUTH, bx + bs * 0.35, south_top, bx + bs * 0.65, south_top + south_confirm_h));
+        fields.push(Self::field(crate::ZONE_TRAY_SOUTH, bx, (south_top + south_confirm_h).min(wh), bx + bs, wh));
+        // North side, mirrored: confirm strip just above the board.
+        let north_bottom = (by - 4.0).max(0.0);
+        let north_confirm_h = north_bottom.min(zone);
+        fields.push(Self::field(
+            crate::ZONE_BTN_NORTH,
+            bx + bs * 0.35,
+            north_bottom - north_confirm_h,
+            bx + bs * 0.65,
+            north_bottom,
+        ));
+        fields.push(Self::field(crate::ZONE_TRAY_NORTH, bx, 0.0, bx + bs, north_bottom - north_confirm_h));
         FieldSet {
             name: FieldSetName::new(crate::FIELD_SET_NAME),
             window: None,
@@ -101,5 +119,27 @@ mod tests {
         for name in ["btn-south", "btn-north", "tray-south", "tray-north"] {
             assert!(set.fields.iter().any(|f| f.name.as_str() == name), "missing {name}");
         }
+    }
+
+    #[test]
+    fn tight_window_collapses_zones_without_overlap() {
+        // The board fills the window edge to edge - the south zones
+        // collapse but the set must stay disjoint (the daemon rejects
+        // overlapping fields at registration).
+        let set = FieldSetBuilder::new((0.0, 0.0, 800.0), (800.0, 800.0)).build();
+        assert!(set.is_disjoint());
+        let tray = set.fields.iter().find(|f| f.name.as_str() == "tray-south").expect("tray");
+        assert_eq!(tray.region.y_min.as_f64(), 800.0);
+        assert_eq!(tray.region.y_max.as_f64(), 800.0);
+    }
+
+    #[test]
+    fn oversized_board_is_clamped_into_the_surface() {
+        // A board taller than the window would overlap the collapsed
+        // tray line - the builder shrinks it to fit.
+        let set = FieldSetBuilder::new((10.0, 5.0, 900.0), (800.0, 400.0)).build();
+        assert!(set.is_disjoint());
+        let f63 = set.fields.iter().find(|f| f.name.as_str() == "f63").expect("f63");
+        assert!(f63.region.y_max.as_f64() <= 400.0);
     }
 }
