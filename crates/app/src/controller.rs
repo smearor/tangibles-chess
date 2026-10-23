@@ -135,6 +135,28 @@ impl GameController {
         let has_mock = matches!(controller.borrow().source, Some(Source::Mock(_)));
         controller.borrow_mut().session.begin();
         controller.borrow_mut().sync_scene();
+        if uses_tangibles {
+            // Show the placement gate immediately - without a first
+            // field event the phase would otherwise sit invisibly in
+            // `AwaitingPlacement`.
+            controller.borrow_mut().update_placement();
+        }
+        if uses_tangibles && has_mock {
+            // Dev convenience: let the mock pretend the current position
+            // is already placed, so the handshake exercises its real
+            // path (event pump -> gate -> confirm) without hardware.
+            let geometry = controller.borrow().geometry;
+            let position = controller.borrow().session.position().clone();
+            if let Some(Source::Mock(mock)) = &controller.borrow().source {
+                for square in Square::ALL {
+                    if position.board().piece_at(square).is_some()
+                        && let Some(field) = BoardGeometry::field_name(geometry.square_to_field(square))
+                    {
+                        mock.place(&field);
+                    }
+                }
+            }
+        }
         if uses_tangibles && !has_mock {
             Self::activate_tangibles(controller.clone());
         }
