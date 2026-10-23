@@ -233,7 +233,10 @@ impl GameController {
         let mut tries = 0u8;
         glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
             tries += 1;
-            let ready = controller.borrow().screen.surface.scene.board_rect().is_some();
+            // `board_rect()` answers `Some` even at a 1px allocation -
+            // require a real size so the registered fields cover real
+            // screen area.
+            let ready = controller.borrow().screen.surface.scene.width() >= 100;
             if !ready {
                 return if tries < 50 {
                     glib::ControlFlow::Continue
