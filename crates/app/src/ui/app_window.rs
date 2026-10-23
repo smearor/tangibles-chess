@@ -59,7 +59,7 @@ impl AppWindow {
                 let l10n = l10n.clone();
                 let stack = stack.clone();
                 move |config| {
-                    Self::start_game(&stack, config.clone(), None, settings.clone(), l10n.clone(), mock, mcp_listen);
+                    Self::start_game(&stack, config.clone(), None, settings.clone(), l10n.clone(), mock);
                 }
             },
             {
@@ -67,7 +67,7 @@ impl AppWindow {
                 let l10n = l10n.clone();
                 let stack = stack.clone();
                 move |saved| {
-                    Self::start_game(&stack, saved.config.clone(), Some(saved.clone()), settings.clone(), l10n.clone(), mock, mcp_listen);
+                    Self::start_game(&stack, saved.config.clone(), Some(saved.clone()), settings.clone(), l10n.clone(), mock);
                 }
             },
         ));
@@ -80,6 +80,13 @@ impl AppWindow {
         setup_scroll.set_propagate_natural_height(false);
         stack.add_named(&setup_scroll, Some("setup"));
         window.set_content(Some(&stack));
+
+        // The MCP endpoint binds at launch, not per game: the handshake
+        // phase is exactly what remote agents want to watch, and the
+        // listener must survive game → setup → game transitions.
+        if let Some(addr) = mcp_listen {
+            GameController::attach_mcp(addr);
+        }
 
         // Probe the daemon's TCP reachability on a helper thread; the
         // result hops back over a channel and greys out the tangible
@@ -106,7 +113,7 @@ impl AppWindow {
             let saved = saved.clone();
             glib::idle_add_local_once(move || {
                 let saved_game = saved.clone();
-                Self::start_game(&stack, settings.last_config.clone(), saved_game, settings.clone(), l10n.clone(), mock, mcp_listen);
+                Self::start_game(&stack, settings.last_config.clone(), saved_game, settings.clone(), l10n.clone(), mock);
             });
         }
 
@@ -128,7 +135,6 @@ impl AppWindow {
         mut settings: AppSettings,
         l10n: Rc<L10n>,
         mock: bool,
-        mcp_listen: Option<std::net::SocketAddr>,
     ) {
         settings.last_config = config.clone();
         settings.sound_enabled = config.sound_enabled;
@@ -148,9 +154,6 @@ impl AppWindow {
         };
         let controller = Rc::new(RefCell::new(GameController::new(session, screen.clone(), settings, l10n.clone(), None)));
         set_active_controller(controller.clone());
-        if let Some(addr) = mcp_listen {
-            GameController::attach_mcp(&controller, addr);
-        }
 
         screen.surface.scene.connect_square({
             let controller = controller.clone();

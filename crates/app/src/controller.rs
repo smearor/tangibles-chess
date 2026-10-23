@@ -232,17 +232,18 @@ impl GameController {
     }
 
     /// Starts the MCP server on `addr` and drains its command channel on
-    /// the GTK main loop, executing each against the live session.
-    pub fn attach_mcp(controller: &Rc<RefCell<Self>>, addr: std::net::SocketAddr) {
+    /// the GTK main loop. Each request is executed against the *active*
+    /// controller - which only exists while a game runs; before that the
+    /// endpoint replies `{"error": "no active game"}`.
+    pub fn attach_mcp(addr: std::net::SocketAddr) {
         let (tx, rx) = async_channel::unbounded::<tangibles_chess_mcp::GameRequest>();
         tangibles_chess_mcp::spawn_http(tx, addr);
-        let weak = Rc::downgrade(controller);
         glib::MainContext::default().spawn_local(async move {
             while let Ok(request) = rx.recv().await {
-                let Some(controller) = weak.upgrade() else {
-                    return;
-                };
-                let reply = controller.borrow_mut().handle_mcp(&request.command);
+                let mut reply = serde_json::json!({ "error": "no active game" });
+                with_controller(|controller| {
+                    reply = controller.borrow_mut().handle_mcp(&request.command);
+                });
                 let _ = request.reply.send(reply);
             }
         });
