@@ -141,10 +141,7 @@ impl GameController {
             // `AwaitingPlacement`.
             controller.borrow_mut().update_placement();
         }
-        if uses_tangibles
-            && has_mock
-            && std::env::var_os("TANGIBLES_MOCK_MANUAL").is_none()
-        {
+        if uses_tangibles && has_mock && std::env::var_os("TANGIBLES_MOCK_MANUAL").is_none() {
             // Dev convenience: let the mock pretend the current position
             // is being placed piece by piece, so the handshake walks its
             // real path (event pump -> gate -> confirm) and the ceremony
@@ -162,14 +159,12 @@ impl GameController {
                         .collect::<Vec<_>>()
                         .into_iter(),
                 ));
-                glib::timeout_add_local(std::time::Duration::from_millis(120), move || {
-                    match fields.borrow_mut().next() {
-                        Some(field) => {
-                            mock.place(&field);
-                            glib::ControlFlow::Continue
-                        }
-                        None => glib::ControlFlow::Break,
+                glib::timeout_add_local(std::time::Duration::from_millis(120), move || match fields.borrow_mut().next() {
+                    Some(field) => {
+                        mock.place(&field);
+                        glib::ControlFlow::Continue
                     }
+                    None => glib::ControlFlow::Break,
                 });
             }
         }
@@ -234,6 +229,129 @@ impl GameController {
     pub fn use_mock(controller: &Rc<RefCell<Self>>, mock: MockSource) {
         Self::start_event_pump(controller.clone(), mock.events());
         controller.borrow_mut().source = Some(Source::Mock(mock));
+    }
+
+    /// Starts the MCP server on `addr` and drains its command channel on
+    /// the GTK main loop, executing each against the live session.
+    pub fn attach_mcp(controller: &Rc<RefCell<Self>>, addr: std::net::SocketAddr) {
+        let (tx, rx) = async_channel::unbounded::<tangibles_chess_mcp::GameRequest>();
+        tangibles_chess_mcp::spawn_http(tx, addr);
+        let weak = Rc::downgrade(controller);
+        glib::MainContext::default().spawn_local(async move {
+            while let Ok(request) = rx.recv().await {
+                let Some(controller) = weak.upgrade() else {
+                    return;
+                };
+                let reply = controller.borrow_mut().handle_mcp(&request.command);
+                let _ = request.reply.send(reply);
+            }
+        });
+        info!(%addr, "MCP control endpoint enabled");
+    }
+
+    /// Executes one MCP command against the session and returns its
+    /// JSON reply.
+    fn handle_mcp(&mut self, command: &tangibles_chess_mcp::CommandKind) -> serde_json::Value {
+        use tangibles_chess_mcp::CommandKind;
+        match command {
+            CommandKind::GameState => self.mcp_game_state(),
+            CommandKind::LegalMoves { square } => {
+                let position = self.session.position();
+                let moves: Vec<String> = position
+                    .legal_moves()
+                    .iter()
+                    .filter(|mv| match square.as_deref() {
+                        Some(name) => name.parse::<Square>().ok() == mv.from(),
+                        None => true,
+                    })
+                    .map(|mv| mv.to_uci(shakmaty::CastlingMode::Standard).to_string())
+                    .collect();
+                serde_json::json!({ "legal_moves": moves, "turn": self.session.turn().to_string() })
+            }
+            CommandKind::MakeMove { uci } => {
+                let parsed = match uci.parse::<shakmaty::uci::UciMove>() {
+                    Ok(mv) => mv.to_move(self.session.position()).ok(),
+                    Err(_) => None,
+                };
+                let Some(mv) = parsed else {
+                    return serde_json::json!({ "error": format!("invalid move '{uci}'") });
+                };
+                let request = MoveRequest {
+                    from: mv.from().unwrap_or_else(|| mv.to()),
+                    to: mv.to(),
+                    promotion: mv.promotion(),
+                };
+                match self.apply_request(request) {
+                    MoveOutcome::Applied { san } => {
+                        serde_json::json!({ "applied": san, "fen": self.session.fen() })
+                    }
+                    MoveOutcome::NeedsPromotion { to } => serde_json::json!({
+                        "needs_promotion": to.to_string(),
+                        "hint": "append a role letter, e.g. 'e7e8q'",
+                    }),
+                    MoveOutcome::Illegal { reason } => serde_json::json!({ "illegal": reason }),
+                }
+            }
+            CommandKind::Undo => match self.session.undo() {
+                Some(plan) => {
+                    let steps: Vec<String> = plan
+                        .steps
+                        .iter()
+                        .map(|step| match step {
+                            tangibles_chess_core::UndoStep::MoveBack { from, to } => {
+                                format!("move {to} back to {from}")
+                            }
+                            tangibles_chess_core::UndoStep::Restore { square, piece } => {
+                                format!("restore {piece:?} on {square}")
+                            }
+                        })
+                        .collect();
+                    self.sync_scene();
+                    serde_json::json!({ "undone": true, "steps": steps, "fen": self.session.fen() })
+                }
+                None => serde_json::json!({ "undone": false, "reason": "nothing to undo" }),
+            },
+            CommandKind::Resign { color } => {
+                let color = match color.as_str() {
+                    "black" => Color::Black,
+                    _ => Color::White,
+                };
+                self.session.resign(color);
+                self.session.finish_if_terminal();
+                self.sync_scene();
+                serde_json::json!({ "resigned": color.to_string(), "outcome": self.session.outcome().map(|o| format!("{o:?}")) })
+            }
+            CommandKind::AgreeDraw => {
+                self.session.agree_draw();
+                self.session.finish_if_terminal();
+                self.sync_scene();
+                serde_json::json!({ "draw_agreed": true, "outcome": self.session.outcome().map(|o| format!("{o:?}")) })
+            }
+            CommandKind::PlacementStatus => {
+                let status = self.gate.check(self.session.position(), &self.probe);
+                serde_json::json!({
+                    "placed": status.placed(),
+                    "total": status.total,
+                    "missing": status.missing.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                    "unexpected": status.unexpected.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                    "consistent": status.is_consistent(),
+                })
+            }
+        }
+    }
+
+    /// Game-state snapshot for the MCP `game_state` tool.
+    fn mcp_game_state(&self) -> serde_json::Value {
+        let config = self.session.config();
+        serde_json::json!({
+            "phase": format!("{:?}", self.session.phase()),
+            "turn": self.session.turn().to_string(),
+            "fen": self.session.fen(),
+            "san_history": self.session.san_history(),
+            "outcome": self.session.outcome().map(|o| format!("{o:?}")),
+            "tangible_mode": format!("{:?}", config.tangible_mode),
+            "claimable_draws": self.session.claimable_draws().iter().map(|d| format!("{d:?}")).collect::<Vec<_>>(),
+        })
     }
 
     /// Drains the field-event channel into the controller on the main
@@ -419,9 +537,10 @@ impl GameController {
     }
 
     /// Validates and applies a move request, dispatching the outcome to
-    /// the UI.
-    pub fn apply_request(&mut self, request: MoveRequest) {
-        match self.session.request_move(request) {
+    /// the UI. Returns the session's outcome for remote callers.
+    pub fn apply_request(&mut self, request: MoveRequest) -> MoveOutcome {
+        let outcome = self.session.request_move(request);
+        match &outcome {
             MoveOutcome::Applied { san } => {
                 debug!("move applied: {san}");
                 self.selected = None;
@@ -441,13 +560,14 @@ impl GameController {
             }
             MoveOutcome::NeedsPromotion { to } => {
                 self.pending_promotion = Some(request);
-                self.show_promotion_picker(to);
+                self.show_promotion_picker(*to);
             }
             MoveOutcome::Illegal { reason } => {
                 warn!("illegal move rejected: {reason}");
-                self.screen.toast(&reason);
+                self.screen.toast(reason);
             }
         }
+        outcome
     }
 
     /// Shows the promotion picker facing the moving player.

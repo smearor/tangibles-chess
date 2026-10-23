@@ -28,8 +28,9 @@ pub struct AppWindow {
 
 impl AppWindow {
     /// Builds the window and wires both screens to the controller.
-    /// `mock` replaces the daemon with an injectable `MockSource`.
-    pub fn new(app: &adw::Application, settings: AppSettings, l10n: Rc<L10n>, mock: bool) -> Self {
+    /// `mock` replaces the daemon with an injectable `MockSource`;
+    /// `mcp_listen` enables the game-domain MCP endpoint.
+    pub fn new(app: &adw::Application, settings: AppSettings, l10n: Rc<L10n>, mock: bool, mcp_listen: Option<std::net::SocketAddr>) -> Self {
         let window = adw::ApplicationWindow::builder()
             .application(app)
             .title(l10n.msg("app-title"))
@@ -58,7 +59,7 @@ impl AppWindow {
                 let l10n = l10n.clone();
                 let stack = stack.clone();
                 move |config| {
-                    Self::start_game(&stack, config.clone(), None, settings.clone(), l10n.clone(), mock);
+                    Self::start_game(&stack, config.clone(), None, settings.clone(), l10n.clone(), mock, mcp_listen);
                 }
             },
             {
@@ -66,7 +67,7 @@ impl AppWindow {
                 let l10n = l10n.clone();
                 let stack = stack.clone();
                 move |saved| {
-                    Self::start_game(&stack, saved.config.clone(), Some(saved.clone()), settings.clone(), l10n.clone(), mock);
+                    Self::start_game(&stack, saved.config.clone(), Some(saved.clone()), settings.clone(), l10n.clone(), mock, mcp_listen);
                 }
             },
         ));
@@ -105,7 +106,7 @@ impl AppWindow {
             let saved = saved.clone();
             glib::idle_add_local_once(move || {
                 let saved_game = saved.clone();
-                Self::start_game(&stack, settings.last_config.clone(), saved_game, settings.clone(), l10n.clone(), mock);
+                Self::start_game(&stack, settings.last_config.clone(), saved_game, settings.clone(), l10n.clone(), mock, mcp_listen);
             });
         }
 
@@ -120,7 +121,15 @@ impl AppWindow {
     }
 
     /// Creates the session + screen + controller for a new or resumed game.
-    fn start_game(stack: &gtk4::Stack, config: GameConfig, saved: Option<SavedGame>, mut settings: AppSettings, l10n: Rc<L10n>, mock: bool) {
+    fn start_game(
+        stack: &gtk4::Stack,
+        config: GameConfig,
+        saved: Option<SavedGame>,
+        mut settings: AppSettings,
+        l10n: Rc<L10n>,
+        mock: bool,
+        mcp_listen: Option<std::net::SocketAddr>,
+    ) {
         settings.last_config = config.clone();
         settings.sound_enabled = config.sound_enabled;
         settings.save();
@@ -139,6 +148,9 @@ impl AppWindow {
         };
         let controller = Rc::new(RefCell::new(GameController::new(session, screen.clone(), settings, l10n.clone(), None)));
         set_active_controller(controller.clone());
+        if let Some(addr) = mcp_listen {
+            GameController::attach_mcp(&controller, addr);
+        }
 
         screen.surface.scene.connect_square({
             let controller = controller.clone();

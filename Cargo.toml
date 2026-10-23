@@ -17,6 +17,7 @@ tangibles-chess-core = { path = "crates/core" }
 tangibles-chess-tangibles = { path = "crates/tangibles" }
 tangibles-chess-engine = { path = "crates/engine" }
 tangibles-chess-icons = { path = "crates/icons" }
+tangibles-chess-mcp = { path = "crates/mcp" }
 # core
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
@@ -54,6 +55,10 @@ tangible-objects-model = { git = "https://github.com/smearor/tangible-objects-rs
 tokio = { version = "1", features = ["full"] }
 futures-lite = "2"
 async-channel = "2"
+# MCP server (game-domain introspection/control)
+rmcp = { version = "3.5", features = ["server", "macros", "schemars", "transport-streamable-http-server"] }
+axum = "0.8"
+schemars = "1"
 # misc
 url = "2"
 clap = { version = "4.5", features = ["derive"] }

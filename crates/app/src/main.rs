@@ -31,6 +31,10 @@ struct Args {
     /// Use the mock tangible source instead of the daemon (development).
     #[arg(long)]
     mock: bool,
+    /// Expose the game-domain MCP endpoint (Streamable HTTP, e.g.
+    /// `127.0.0.1:8091` or `0.0.0.0:8091` for LAN agents).
+    #[arg(long)]
+    mcp_listen: Option<std::net::SocketAddr>,
 }
 
 fn main() -> glib::ExitCode {
@@ -70,7 +74,7 @@ fn main() -> glib::ExitCode {
             }
         }
         install_css();
-        let window = AppWindow::new(app, settings.clone(), l10n.clone(), args.mock);
+        let window = AppWindow::new(app, settings.clone(), l10n.clone(), args.mock, args.mcp_listen);
         window.window.present();
         if std::env::var_os("TANGIBLES_NO_FULLSCREEN").is_none() {
             // Fullscreen must be requested once the window is presented;
@@ -80,7 +84,9 @@ fn main() -> glib::ExitCode {
         }
     });
 
-    application.run()
+    // `run()` would feed argv to GTK's own option parser, which rejects
+    // our flags; clap already consumed them.
+    application.run_with_args(&["tangibles-chess"])
 }
 
 /// Registers the application stylesheet.
