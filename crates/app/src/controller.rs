@@ -423,6 +423,13 @@ impl GameController {
         let mm_per_px_x = screen_w_mm / panel_w;
         let mm_per_px_y = screen_h_mm / panel_h;
         let mm_per_px = (mm_per_px_x + mm_per_px_y) / 2.0;
+        let widget_size = (self.screen.widget.width(), self.screen.widget.height());
+        let scene_rect = self.screen.surface.scene.board_rect();
+        info!(
+            "field set build: panel={panel_w:.0}x{panel_h:.0}px -> {:.3}mm/px (x={mm_per_px_x:.3} y={mm_per_px_y:.3}), \
+             widget={}x{}, scene_board={scene_rect:?}",
+            widget_size.0, widget_size.1, mm_per_px
+        );
         if let Some((bx, by, bs)) = self.screen.surface.scene.board_rect_mm(mm_per_px) {
             self.board_mm = (bx, by, bs);
         } else {
@@ -430,6 +437,10 @@ impl GameController {
             let side = panel_w.min(panel_h) * 0.88 * mm_per_px;
             self.board_mm = ((screen_w_mm - side) / 2.0, (screen_h_mm - side) / 2.0, side);
         }
+        info!(
+            "field set board_mm: ({:.1}, {:.1}, {:.1}) on {:.1}x{:.1}mm surface",
+            self.board_mm.0, self.board_mm.1, self.board_mm.2, screen_w_mm, screen_h_mm
+        );
         FieldSetBuilder::new(self.board_mm, (screen_w_mm, screen_h_mm)).build()
     }
 
