@@ -141,20 +141,36 @@ impl GameController {
             // `AwaitingPlacement`.
             controller.borrow_mut().update_placement();
         }
-        if uses_tangibles && has_mock {
+        if uses_tangibles
+            && has_mock
+            && std::env::var_os("TANGIBLES_MOCK_MANUAL").is_none()
+        {
             // Dev convenience: let the mock pretend the current position
-            // is already placed, so the handshake exercises its real
-            // path (event pump -> gate -> confirm) without hardware.
+            // is being placed piece by piece, so the handshake walks its
+            // real path (event pump -> gate -> confirm) and the ceremony
+            // lighting is visible without hardware. Set
+            // TANGIBLES_MOCK_MANUAL=1 to keep the gate unsatisfied.
             let geometry = controller.borrow().geometry;
             let position = controller.borrow().session.position().clone();
             if let Some(Source::Mock(mock)) = &controller.borrow().source {
-                for square in Square::ALL {
-                    if position.board().piece_at(square).is_some()
-                        && let Some(field) = BoardGeometry::field_name(geometry.square_to_field(square))
-                    {
-                        mock.place(&field);
+                let mock = mock.clone();
+                let fields: Rc<RefCell<std::vec::IntoIter<String>>> = Rc::new(RefCell::new(
+                    Square::ALL
+                        .iter()
+                        .filter(|square| position.board().piece_at(**square).is_some())
+                        .filter_map(|square| BoardGeometry::field_name(geometry.square_to_field(*square)))
+                        .collect::<Vec<_>>()
+                        .into_iter(),
+                ));
+                glib::timeout_add_local(std::time::Duration::from_millis(120), move || {
+                    match fields.borrow_mut().next() {
+                        Some(field) => {
+                            mock.place(&field);
+                            glib::ControlFlow::Continue
+                        }
+                        None => glib::ControlFlow::Break,
                     }
-                }
+                });
             }
         }
         if uses_tangibles && !has_mock {
