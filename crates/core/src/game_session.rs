@@ -93,9 +93,10 @@ impl GameSession {
     }
 
     /// Starts the handshake for tangible modes, or the game directly in
-    /// `NoTangibles`.
+    /// `NoTangibles` - and when `require_placement` is off, tangibles
+    /// start immediately without the physical-setup handshake.
     pub fn begin(&mut self) {
-        self.phase = if self.config.tangible_mode.uses_tangibles() {
+        self.phase = if self.config.tangible_mode.uses_tangibles() && self.config.require_placement {
             GamePhase::AwaitingPlacement
         } else {
             GamePhase::InProgress

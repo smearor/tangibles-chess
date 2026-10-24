@@ -24,6 +24,10 @@ pub struct GameConfig {
     pub black: OpponentKind,
     /// Whether sound effects are enabled.
     pub sound_enabled: bool,
+    /// Whether tangible games require the full placement handshake
+    /// (all 32 pieces on their starting squares) before the game
+    /// begins. Disable to debug without a complete physical setup.
+    pub require_placement: bool,
 }
 
 impl Default for GameConfig {
@@ -36,6 +40,7 @@ impl Default for GameConfig {
             white: OpponentKind::Human,
             black: OpponentKind::Human,
             sound_enabled: true,
+            require_placement: true,
         }
     }
 }

@@ -182,6 +182,19 @@ impl SetupScreen {
         });
         group.add(&commit);
 
+        // Placement handshake (only meaningful with tangibles).
+        let handshake = adw::SwitchRow::new();
+        handshake.set_title(&l10n.msg("setup-handshake-label"));
+        handshake.set_subtitle(&l10n.msg("setup-handshake-subtitle"));
+        handshake.set_active(config.borrow().require_placement);
+        handshake.connect_active_notify({
+            let config = config.clone();
+            move |row| {
+                config.borrow_mut().require_placement = row.is_active();
+            }
+        });
+        group.add(&handshake);
+
         // Opponent (engine reserved for M3 - visible but disabled).
         let opponent = adw::ComboRow::new();
         opponent.set_title(&l10n.msg("setup-opponent-label"));
