@@ -21,6 +21,8 @@ icons = [
     "rotate-ccw",
     "undo",
     "undo-2",
+    "redo",
+    "log-out",
     "settings",
     "triangle-alert",
     "trophy",
