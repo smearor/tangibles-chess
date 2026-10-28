@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  APT_PACKAGES: curl build-essential pkg-config libgtk-4-dev libglib2.0-dev libadwaita-1-dev
+  APT_PACKAGES: curl build-essential pkg-config libgtk-4-dev libglib2.0-dev libadwaita-1-dev libgtk4-layer-shell-dev
 
 jobs:
   formatting:
