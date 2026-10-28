@@ -22,6 +22,23 @@ pub struct ThemePalette {
     pub check: (f64, f64, f64),
     /// Setup-ceremony "correctly placed" glow.
     pub ceremony: (f64, f64, f64),
+    /// Embedded luminance texture for the squares (`"wood"`, `"slate"`,
+    /// `"fabric"`, `"marble"`), multiply-composited over the board.
+    pub texture: Option<&'static str>,
+    /// How the texture maps onto the board.
+    pub texture_layout: TextureLayout,
+}
+
+/// How a theme's texture maps onto the board.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum TextureLayout {
+    /// One continuous sheet across the whole board (stone, felt).
+    #[default]
+    BoardWide,
+    /// Each square shows an individual block of material with its own
+    /// grain - like real wood inlay, where light and dark squares are
+    /// separate pieces of maple and walnut.
+    PerSquare,
 }
 
 impl ThemePalette {
@@ -37,6 +54,8 @@ impl ThemePalette {
                 last_move: (0.55, 0.78, 0.44),
                 check: (0.90, 0.28, 0.22),
                 ceremony: (0.98, 0.90, 0.55),
+                texture: Some("wood"),
+                texture_layout: TextureLayout::PerSquare,
             },
             BoardTheme::Slate => Self {
                 light: (0.78, 0.80, 0.84),
@@ -47,6 +66,8 @@ impl ThemePalette {
                 last_move: (0.50, 0.72, 0.62),
                 check: (0.92, 0.34, 0.30),
                 ceremony: (0.70, 0.85, 0.98),
+                texture: Some("slate"),
+                texture_layout: TextureLayout::BoardWide,
             },
             BoardTheme::TournamentGreen => Self {
                 light: (0.91, 0.88, 0.74),
@@ -57,6 +78,20 @@ impl ThemePalette {
                 last_move: (0.65, 0.82, 0.45),
                 check: (0.88, 0.25, 0.22),
                 ceremony: (0.95, 0.90, 0.50),
+                texture: Some("fabric"),
+                texture_layout: TextureLayout::BoardWide,
+            },
+            BoardTheme::Marble => Self {
+                light: (0.85, 0.84, 0.80),
+                dark: (0.30, 0.32, 0.34),
+                frame: (0.18, 0.19, 0.21),
+                selection: (0.95, 0.75, 0.35),
+                target: (0.88, 0.68, 0.32),
+                last_move: (0.60, 0.70, 0.55),
+                check: (0.88, 0.28, 0.24),
+                ceremony: (0.90, 0.85, 0.55),
+                texture: Some("marble"),
+                texture_layout: TextureLayout::BoardWide,
             },
         }
     }

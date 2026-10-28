@@ -13,6 +13,7 @@ use shakmaty::Square;
 use tangibles_chess_core::BoardTheme;
 
 use crate::piece_icons::piece_icon_name;
+use crate::theme::TextureLayout;
 use crate::theme::ThemePalette;
 
 /// Everything the scene needs to draw one frame.
@@ -22,6 +23,9 @@ pub(crate) struct SceneState {
     pub(crate) position: Option<Chess>,
     /// Whether rendered piece glyphs are drawn at all (off in `Tangibles`).
     pub(crate) render_pieces: bool,
+    /// Whether captured-piece parking columns are drawn beside the
+    /// board (physical modes only).
+    pub(crate) parking_zones: bool,
     /// The active board material.
     pub(crate) theme: BoardTheme,
     /// Selected square (touch input), if any.
@@ -42,6 +46,8 @@ pub(crate) struct SceneState {
     pub(crate) foreign: Vec<Square>,
     /// Ghost target of the guided undo, if any.
     pub(crate) ghost: Option<(Square, Square)>,
+    /// Briefly flashed squares explaining a rejected move.
+    pub(crate) illegal: Option<IllegalFlash>,
     /// Physical/logical discrepancy markers (`TangiblesRendered`).
     pub(crate) discrepant: Vec<Square>,
 }
@@ -51,6 +57,7 @@ impl Default for SceneState {
         Self {
             position: None,
             render_pieces: true,
+            parking_zones: false,
             theme: BoardTheme::default(),
             selected: None,
             legal_targets: Vec::new(),
@@ -61,6 +68,7 @@ impl Default for SceneState {
             missing: Vec::new(),
             foreign: Vec::new(),
             ghost: None,
+            illegal: None,
             discrepant: Vec::new(),
         }
     }
@@ -68,6 +76,29 @@ impl Default for SceneState {
 
 /// Tap callback receiving a scene-space square.
 type SquareHandler = Rc<dyn Fn(Square)>;
+
+/// A rejected move's flash: the rejected target plus, when the naive
+/// move would have left the own king in check, the king and its
+/// attackers.
+#[derive(Debug)]
+pub(crate) struct IllegalFlash {
+    /// Flashed squares with their meaning.
+    pub squares: Vec<(Square, FlashRole)>,
+    /// Generation counter so a stale expiry timer cannot clear a newer
+    /// flash.
+    pub generation: u64,
+}
+
+/// What a flashed square explains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FlashRole {
+    /// The rejected destination.
+    Target,
+    /// The own king left in check.
+    King,
+    /// An attacker giving that check.
+    Attacker,
+}
 
 /// The drawable, tappable board.
 ///
@@ -158,6 +189,19 @@ mod imp {
                 text_centered(&frame, &letter, cx, by - margin / 2.0, std::f64::consts::PI);
             }
 
+            // Captured-piece parking columns (physical modes): one cell
+            // wide, board height, flush beside the board - matching the
+            // `cap-*` daemon fields registered for the same geometry.
+            if state.parking_zones {
+                let parking = snapshot.append_cairo(&graphene::Rect::new((bx - cell) as f32, by as f32, (bs + 2.0 * cell) as f32, bs as f32));
+                if bx >= cell {
+                    parking_strip(&parking, bx - cell, by, cell, &palette);
+                }
+                if bx + bs + cell <= width {
+                    parking_strip(&parking, bx + bs, by, cell, &palette);
+                }
+            }
+
             let squares = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
             for scene in 0..64usize {
                 let (row, col) = (scene / 8, scene % 8);
@@ -168,6 +212,26 @@ mod imp {
                 squares.set_source_rgb(base.0, base.1, base.2);
                 squares.rectangle(x, y, cell, cell);
                 let _ = squares.fill();
+
+                // Per-square material (wood inlay): every square samples
+                // its own crop of the texture, so the grain ends at the
+                // square's edge like a real piece of wood.
+                if palette.texture_layout == TextureLayout::PerSquare
+                    && let Some(surface) = palette.texture.and_then(texture_surface)
+                {
+                    let offset_x = pseudo_random(scene as u32, 3) * f64::from(surface.width());
+                    let offset_y = pseudo_random(scene as u32, 11) * f64::from(surface.height());
+                    let pattern = gtk4::cairo::SurfacePattern::create(&surface);
+                    pattern.set_extend(gtk4::cairo::Extend::Repeat);
+                    let mut matrix = gtk4::cairo::Matrix::identity();
+                    matrix.translate(offset_x - x, offset_y - y);
+                    pattern.set_matrix(matrix);
+                    squares.set_operator(gtk4::cairo::Operator::Multiply);
+                    let _ = squares.set_source(&pattern);
+                    squares.rectangle(x, y, cell, cell);
+                    let _ = squares.fill();
+                    squares.set_operator(gtk4::cairo::Operator::Over);
+                }
 
                 // Layered highlights.
                 if state.last_move.is_some_and(|(from, to)| from == square || to == square) {
@@ -191,12 +255,53 @@ mod imp {
                 if state.check == Some(square) {
                     fill_highlight(&squares, x, y, cell, palette.check, 0.45);
                 }
+                if let Some(flash) = &state.illegal {
+                    for (flashed, role) in &flash.squares {
+                        if *flashed == square {
+                            match role {
+                                FlashRole::Target => fill_highlight(&squares, x, y, cell, palette.check, 0.55),
+                                FlashRole::King => {
+                                    fill_highlight(&squares, x, y, cell, palette.check, 0.45);
+                                    ring_highlight(&squares, x, y, cell, palette.check);
+                                }
+                                FlashRole::Attacker => ring_highlight(&squares, x, y, cell, palette.check),
+                            }
+                        }
+                    }
+                }
                 if state.lifted == Some(square) {
                     fill_highlight(&squares, x, y, cell, palette.selection, 0.18);
                 }
                 if state.ghost.is_some_and(|(_, to)| to == square) {
                     ring_highlight(&squares, x, y, cell, palette.ceremony);
                 }
+            }
+
+            // Material texture: one continuous luminance image multiplied
+            // over the whole board, so the grain runs seamlessly across
+            // square boundaries while each square keeps its base tint.
+            if palette.texture_layout == TextureLayout::BoardWide
+                && let Some(surface) = palette.texture.and_then(texture_surface)
+            {
+                // Pattern space is surface pixels: scale it so one image
+                // spans `repeat` px on the board, anchored at the board
+                // corner - the repeat then tiles seamlessly.
+                let repeat = cell * 2.4;
+                let scale = f64::from(surface.width()) / repeat;
+                let mut matrix = gtk4::cairo::Matrix::identity();
+                matrix.translate(-bx, -by);
+                matrix.scale(scale, scale);
+                let pattern = gtk4::cairo::SurfacePattern::create(&surface);
+                pattern.set_matrix(matrix);
+                // Surface patterns default to Extend::None - without
+                // Repeat the texture would only cover one tile and
+                // multiply the rest of the board by transparent black.
+                pattern.set_extend(gtk4::cairo::Extend::Repeat);
+                squares.set_operator(gtk4::cairo::Operator::Multiply);
+                let _ = squares.set_source(&pattern);
+                squares.rectangle(bx, by, bs, bs);
+                let _ = squares.fill();
+                squares.set_operator(gtk4::cairo::Operator::Over);
             }
 
             // Piece layer.
@@ -353,6 +458,86 @@ fn square_scene(square: Square) -> usize {
     (7 - rank) * 8 + file
 }
 
+/// One captured-piece parking column: eight muted cells so the strip
+/// reads as a place to park pieces rather than as board squares.
+fn parking_strip(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, palette: &ThemePalette) {
+    for index in 0..8 {
+        let yy = y + index as f64 * cell;
+        cr.set_source_rgba(palette.dark.0, palette.dark.1, palette.dark.2, 0.30);
+        cr.rectangle(x, yy, cell, cell);
+        let _ = cr.fill();
+        cr.set_source_rgba(palette.frame.0, palette.frame.1, palette.frame.2, 0.7);
+        cr.set_line_width(1.0);
+        cr.rectangle(x + 0.5, yy + 0.5, cell - 1.0, cell - 1.0);
+        let _ = cr.stroke();
+    }
+}
+
+/// Deterministic pseudo-random value in `0.0..1.0` for a square+key
+/// pair - keeps per-square texture crops stable across repaints.
+fn pseudo_random(seed: u32, key: u32) -> f64 {
+    let hash = seed.wrapping_mul(2_654_435_761).wrapping_add(key.wrapping_mul(40_503));
+    f64::from(hash % 1000) / 1000.0
+}
+
+/// The embedded luminance texture for `name`, decoded once (cairo
+/// surfaces are single-threaded, so the cache is thread-local like the
+/// paintable cache).
+fn texture_surface(name: &str) -> Option<gtk4::cairo::ImageSurface> {
+    thread_local! {
+        static SURFACES: std::cell::RefCell<std::collections::HashMap<&'static str, Option<gtk4::cairo::ImageSurface>>> =
+            std::cell::RefCell::new(std::collections::HashMap::new());
+    }
+    SURFACES.with(|surfaces| {
+        let mut surfaces = surfaces.borrow_mut();
+        surfaces
+            .entry(match name {
+                "wood" => "wood",
+                "slate" => "slate",
+                "fabric" => "fabric",
+                "marble" => "marble",
+                _ => return None,
+            })
+            .or_insert_with(|| {
+                let bytes: &[u8] = match name {
+                    "wood" => include_bytes!("../../resources/textures/wood.png"),
+                    "slate" => include_bytes!("../../resources/textures/slate.png"),
+                    "fabric" => include_bytes!("../../resources/textures/fabric.png"),
+                    "marble" => include_bytes!("../../resources/textures/marble.png"),
+                    _ => return None,
+                };
+                // gdk decodes the PNG; the pixels are then copied into a
+                // cairo image surface (channel order is irrelevant - the
+                // texture is grayscale, so R == G == B either way).
+                decode_texture(bytes)
+            })
+            .clone()
+    })
+}
+
+/// Decodes embedded PNG bytes into a cairo image surface via
+/// [`gtk4::gdk::Texture`].
+fn decode_texture(bytes: &'static [u8]) -> Option<gtk4::cairo::ImageSurface> {
+    let texture = gtk4::gdk::Texture::from_bytes(&gtk4::glib::Bytes::from_static(bytes)).ok()?;
+    let (width, height) = (texture.width() as usize, texture.height() as usize);
+    // PNG textures are 4-channel RGBA data; channel order does not
+    // matter because the grayscale texture has R == G == B either way.
+    let stride = width * 4;
+    let mut pixels = vec![0u8; height * stride];
+    texture.download(&mut pixels, stride);
+    let mut surface = gtk4::cairo::ImageSurface::create(gtk4::cairo::Format::ARgb32, texture.width(), texture.height()).ok()?;
+    let surface_stride = surface.stride() as usize;
+    {
+        let mut surface_data = surface.data().ok()?;
+        for row in 0..height {
+            let (src, dst) = (row * stride, row * surface_stride);
+            surface_data[dst..dst + stride].copy_from_slice(&pixels[src..src + stride]);
+        }
+    }
+    surface.mark_dirty();
+    Some(surface)
+}
+
 /// Soft filled highlight over one cell.
 fn fill_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: (f64, f64, f64), alpha: f64) {
     cr.set_source_rgba(color.0, color.1, color.2, alpha);
@@ -389,5 +574,43 @@ fn text_centered(cr: &gtk4::cairo::Context, text: &str, x: f64, y: f64, angle: f
         cr.move_to(-(extents.x_bearing() + extents.width() / 2.0), -(extents.y_bearing() + extents.height() / 2.0));
         let _ = cr.show_text(text);
         let _ = cr.restore();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_texture;
+
+    /// The embedded textures must decode to a valid cairo surface;
+    /// otherwise the material layer is silently skipped.
+    #[test]
+    fn decodes_embedded_textures() {
+        let texture = decode_texture(include_bytes!("../../resources/textures/wood.png"));
+        assert!(texture.is_some(), "gdk failed to decode the texture");
+        if let Some(surface) = texture {
+            assert!(surface.width() > 0);
+            assert!(surface.height() > 0);
+        }
+    }
+
+    /// The copied pixels must carry actual texture content - a uniform
+    /// surface would make the multiply pass invisible.
+    #[test]
+    fn texture_pixels_carry_luminance_variation() {
+        let Some(mut surface) = decode_texture(include_bytes!("../../resources/textures/wood.png")) else {
+            panic!("texture did not decode");
+        };
+        let (stride, width) = (surface.stride() as usize, surface.width() as usize);
+        let height = surface.height() as usize;
+        let data = surface.data().expect("surface data");
+        let (mut min, mut max) = (255u8, 0u8);
+        for row in 0..height {
+            for col in 0..width {
+                let pixel = data[row * stride + col * 4];
+                min = min.min(pixel);
+                max = max.max(pixel);
+            }
+        }
+        assert!(max as i32 - min as i32 > 20, "texture is uniform: min {min}, max {max}");
     }
 }

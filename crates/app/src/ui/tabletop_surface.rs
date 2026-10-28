@@ -28,6 +28,10 @@ pub struct TabletopSurface {
     pub white_sheet: ScoreSheet,
     /// Black's score sheet (north).
     pub black_sheet: ScoreSheet,
+    /// White's status line (between board and controls).
+    pub white_status: gtk4::Label,
+    /// Black's status line (between board and controls).
+    pub black_status: gtk4::Label,
 }
 
 impl TabletopSurface {
@@ -37,29 +41,40 @@ impl TabletopSurface {
         scene.update(|state| {
             state.theme = config.theme;
             state.render_pieces = config.tangible_mode.renders_pieces();
+            state.parking_zones = config.tangible_mode.uses_tangibles();
         });
 
-        let white_panel = PlayerPanel::new(shakmaty::Color::White, "White", actions, l10n);
-        let black_panel = PlayerPanel::new(shakmaty::Color::Black, "Black", actions, l10n);
-        let white_sheet = ScoreSheet::new();
-        let black_sheet = ScoreSheet::new();
+        let white_panel = PlayerPanel::new(shakmaty::Color::White, actions, l10n);
+        let black_panel = PlayerPanel::new(shakmaty::Color::Black, actions, l10n);
+        let white_sheet = ScoreSheet::new(shakmaty::Color::White);
+        let black_sheet = ScoreSheet::new(shakmaty::Color::Black);
+        let white_status = Self::status_line();
+        let black_status = Self::status_line();
 
-        // North half: rotated 180° so black's panel and sheet face the
-        // far edge.
+        // North half: rotated 180° so black's panel, sheet and status
+        // line face the far edge. Scene-space order puts the status
+        // label first so the flip lands it between board and controls.
         let north_rotated = RotationWidget::new(SmearorRotation::new(180.0))
             .with_gesture_rotation_enabled(false)
             .with_animations_enabled(false);
-        let north = gtk4::Box::new(gtk4::Orientation::Horizontal, 24);
-        north.set_halign(gtk4::Align::Center);
-        north.append(&black_panel.widget);
-        north.append(&black_sheet.widget);
+        let north_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 24);
+        north_row.set_halign(gtk4::Align::Center);
+        north_row.append(&black_panel.widget);
+        north_row.append(&black_sheet.widget);
+        let north = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
+        north.append(&black_status);
+        north.append(&north_row);
         north_rotated.set_child(Some(&north));
 
-        // South half faces the near edge directly.
-        let south = gtk4::Box::new(gtk4::Orientation::Horizontal, 24);
-        south.set_halign(gtk4::Align::Center);
-        south.append(&white_sheet.widget);
-        south.append(&white_panel.widget);
+        // South half faces the near edge directly: status line between
+        // board and controls.
+        let south_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 24);
+        south_row.set_halign(gtk4::Align::Center);
+        south_row.append(&white_sheet.widget);
+        south_row.append(&white_panel.widget);
+        let south = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
+        south.append(&white_status);
+        south.append(&south_row);
 
         let widget = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         widget.append(&north_rotated);
@@ -73,6 +88,17 @@ impl TabletopSurface {
             black_panel,
             white_sheet,
             black_sheet,
+            white_status,
+            black_status,
         }
+    }
+
+    /// A centered status-line label with a fixed height so appearing or
+    /// disappearing text does not move the board.
+    fn status_line() -> gtk4::Label {
+        let label = gtk4::Label::new(None);
+        label.add_css_class("status-line");
+        label.set_xalign(0.5);
+        label
     }
 }

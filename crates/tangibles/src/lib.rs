@@ -62,3 +62,9 @@ pub const ZONE_BTN_NORTH: &str = "btn-north";
 pub const ZONE_TRAY_SOUTH: &str = "tray-south";
 /// Field name of the north-side captured tray.
 pub const ZONE_TRAY_NORTH: &str = "tray-north";
+/// Captured-piece parking column directly west of the board (one
+/// board-cell wide, board height). Markers placed here are swallowed:
+/// the field suppresses OS forwarding and the inference ignores it.
+pub const ZONE_CAP_WEST: &str = "cap-west";
+/// Same parking column east of the board.
+pub const ZONE_CAP_EAST: &str = "cap-east";

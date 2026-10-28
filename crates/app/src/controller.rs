@@ -3,18 +3,28 @@ use std::rc::Rc;
 
 use gdk4::prelude::DisplayExt;
 use gdk4::prelude::MonitorExt;
+use gdk4::prelude::PaintableExt;
+use gdk4::prelude::StaticType;
 use gdk4::prelude::SurfaceExt;
+use gdk4::prelude::TextureExt;
+use gtk4::prelude::Cast;
+use gtk4::prelude::GskRendererExt;
 use gtk4::prelude::NativeExt;
+use gtk4::prelude::SnapshotExt;
 use gtk4::prelude::WidgetExt;
+use libadwaita as adw;
 use shakmaty::Color;
 use shakmaty::KnownOutcome;
 use shakmaty::Position;
 use shakmaty::Square;
+use tangibles_chess_core::DrawReason;
+use tangibles_chess_core::GameConfig;
 use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::GameSession;
 use tangibles_chess_core::MoveOutcome;
 use tangibles_chess_core::MoveRequest;
 use tangibles_chess_core::TangibleMode;
+use tangibles_chess_icons::icon_names;
 use tangibles_chess_tangibles::BoardGeometry;
 use tangibles_chess_tangibles::FieldEvent;
 use tangibles_chess_tangibles::FieldEventKind;
@@ -36,6 +46,9 @@ use crate::l10n::L10n;
 use crate::settings::AppSettings;
 use crate::sound::SoundPlayer;
 use crate::tangible_host::TangibleHost;
+use crate::ui::chess_scene::FlashRole;
+use crate::ui::chess_scene::IllegalFlash;
+use crate::ui::game_result::GameResult;
 use crate::ui::game_screen::GameScreen;
 use crate::ui::promotion_picker::PromotionPicker;
 
@@ -82,7 +95,22 @@ pub struct GameController {
     last_move: Option<(Square, Square)>,
     /// Board rectangle in screen mm for the registered field set.
     board_mm: (f64, f64, f64),
+    /// Whether the game-over overlay was already shown.
+    result_shown: bool,
+    /// Generation counter for the illegal-move flash.
+    illegal_seq: u64,
+    /// Last rejected tangible move (`from`, `to`): the physical marker
+    /// is misplaced; a lift+place back onto `from` is accepted quietly.
+    rejected_move: Option<(Square, Square)>,
+    /// Ply cursor while replaying a finished game (`None` = live).
+    replay_index: Option<usize>,
+    /// The game-over overlay widget, kept for removal when entering
+    /// replay mode.
+    result_widget: Option<gtk4::Widget>,
 }
+
+/// How long a rejected move's squares flash red (ms).
+const ILLEGAL_FLASH_MS: u64 = 800;
 
 thread_local! {
     /// The active controller, reachable from widget callbacks that do
@@ -112,6 +140,13 @@ impl GameController {
         let inference = MoveInference::new(geometry, session.config().commit_mode);
         let gate = PlacementGate::new(geometry);
         let sound = SoundPlayer::new(session.config().sound_enabled);
+        // Score-sheet ply clicks jump the replay cursor (finished games
+        // only - `replay_goto` guards otherwise).
+        let on_ply = Rc::new(|ply: usize| {
+            with_controller(|controller| controller.borrow_mut().replay_goto(ply));
+        });
+        screen.surface.white_sheet.set_on_ply(on_ply.clone());
+        screen.surface.black_sheet.set_on_ply(on_ply);
         Self {
             session,
             settings,
@@ -129,6 +164,11 @@ impl GameController {
             promotion_widget: RefCell::new(None),
             last_move: None,
             board_mm: (0.0, 0.0, 0.0),
+            result_shown: false,
+            illegal_seq: 0,
+            rejected_move: None,
+            replay_index: None,
+            result_widget: None,
         }
     }
 
@@ -372,6 +412,7 @@ impl GameController {
                 self.sync_scene();
                 serde_json::json!({ "draw_agreed": true, "outcome": self.session.outcome().map(|o| format!("{o:?}")) })
             }
+            CommandKind::Screenshot => self.mcp_screenshot(),
             CommandKind::PlacementStatus => {
                 let status = self.gate.check(self.session.position(), &self.probe);
                 serde_json::json!({
@@ -382,6 +423,61 @@ impl GameController {
                     "consistent": status.is_consistent(),
                 })
             }
+        }
+    }
+
+    /// PNG screenshot of the window for the MCP `screenshot` tool.
+    fn mcp_screenshot(&self) -> serde_json::Value {
+        let Some(texture) = self.screenshot_texture() else {
+            return serde_json::json!({ "error": "window is not realized" });
+        };
+        let bytes = texture.save_to_png_bytes();
+        serde_json::json!({
+            "png_base64": gtk4::glib::base64_encode(bytes.as_ref()).as_str(),
+            "width": texture.width(),
+            "height": texture.height(),
+        })
+    }
+
+    /// Renders the whole window into a texture (snapshot path shared by
+    /// the MCP tool and the save-to-file action).
+    fn screenshot_texture(&self) -> Option<gtk4::gdk::Texture> {
+        let window = self
+            .screen
+            .widget
+            .ancestor(adw::ApplicationWindow::static_type())?
+            .downcast::<adw::ApplicationWindow>()
+            .ok()?;
+        let surface = window.surface()?;
+        let snapshot = gtk4::Snapshot::new();
+        gtk4::WidgetPaintable::new(Some(&window)).snapshot(&snapshot, f64::from(window.width()), f64::from(window.height()));
+        let node = snapshot.to_node()?;
+        let renderer = gtk4::gsk::Renderer::for_surface(&surface)?;
+        let viewport = gtk4::graphene::Rect::new(0.0, 0.0, window.width() as f32, window.height() as f32);
+        let texture = renderer.render_texture(&node, Some(&viewport));
+        // A renderer may only be disposed while unrealized - dropping it
+        // while it is still realized on the surface asserts in GSK.
+        renderer.unrealize();
+        Some(texture)
+    }
+
+    /// Saves a window screenshot into the app data directory (win.screenshot).
+    pub fn screenshot(&self) {
+        let Some(texture) = self.screenshot_texture() else {
+            return;
+        };
+        let dir = glib::user_data_dir().join("tangibles-chess").join("screenshots");
+        if std::fs::create_dir_all(&dir).is_err() {
+            return;
+        }
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|since| since.as_secs())
+            .unwrap_or(0);
+        let path = dir.join(format!("screenshot-{stamp}.png"));
+        if std::fs::write(&path, texture.save_to_png_bytes().as_ref()).is_ok() {
+            tracing::info!("screenshot saved to {}", path.display());
+            self.screen.show_message(&self.l10n.msg("game-screenshot-saved"));
         }
     }
 
@@ -486,6 +582,12 @@ impl GameController {
 
     /// Field events during the game: move inference and zones.
     fn on_game_field_event(&mut self, event: FieldEvent) {
+        // While replaying, the physical board only feeds the
+        // discrepancy display - no move inference.
+        if self.replay_index.is_some() {
+            self.update_discrepancy();
+            return;
+        }
         // Visual feedback: the lifted square glows while a piece is in
         // the air ("light under the figure").
         if event.kind == FieldEventKind::FieldLifted
@@ -501,6 +603,26 @@ impl GameController {
                     state.legal_targets = self.legal_targets_cached(lifted);
                 }
             });
+        }
+        // Graceful return after a rejected intent: lifting the misplaced
+        // marker and placing it back on its origin restores the board
+        // quietly instead of producing lift/place anomalies.
+        if let Some((from, to)) = self.rejected_move
+            && let Some(name) = event.field.as_deref()
+            && let Some(index) = BoardGeometry::field_index(name)
+            && let Some(square) = self.geometry.field_to_square(index)
+        {
+            match event.kind {
+                FieldEventKind::FieldLifted if square == to => return,
+                FieldEventKind::FieldPlaced if square == from || square == to => {
+                    // Back on its origin resolves the rejection; dropped
+                    // on the same wrong square keeps it pending.
+                    self.rejected_move = (square == to).then_some((from, to));
+                    return;
+                }
+                FieldEventKind::FieldPlaced => self.rejected_move = None,
+                _ => {}
+            }
         }
         let position = self.session.position().clone();
         for output in self.inference.on_event(&event, &position) {
@@ -521,11 +643,33 @@ impl GameController {
                 }
                 InferenceOutput::Anomaly { detail } => {
                     warn!("board anomaly: {detail}");
-                    self.screen.toast(&self.l10n.msg("anomaly-detail"));
+                    self.screen.show_message_for(self.session.turn(), &self.l10n.msg("anomaly-detail"));
                 }
                 InferenceOutput::Lagged => self.resync_occupancy(),
             }
         }
+        self.update_discrepancy();
+    }
+
+    /// Physical-vs-logical board mismatch markers (`TangiblesRendered`).
+    ///
+    /// In the rendered mode the scene draws both layers, so squares
+    /// where the physical occupancy diverges from the position get a
+    /// persistent ring until the marker is corrected.
+    fn update_discrepancy(&self) {
+        let discrepant = if self.session.config().tangible_mode == TangibleMode::TangiblesRendered {
+            Square::ALL
+                .into_iter()
+                .filter(|square| {
+                    let logical = self.session.position().board().piece_at(*square).is_some();
+                    let physical = self.probe.occupied().contains(&self.geometry.square_to_field(*square));
+                    logical != physical
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        self.screen.surface.scene.update(|state| state.discrepant = discrepant);
     }
 
     /// Releases this app's daemon registrations (the chess field set) -
@@ -586,13 +730,27 @@ impl GameController {
         if self.session.phase() != GamePhase::InProgress {
             return;
         }
-        if let Some(from) = self.selected
-            && (self.session.legal_targets(from).contains(&square) || square == from)
-        {
-            if square != from {
-                self.apply_request(MoveRequest::new(from, square));
+        if let Some(from) = self.selected {
+            if square == from {
+                return;
             }
-            return;
+            if self.session.legal_targets(from).contains(&square) {
+                self.apply_request(MoveRequest::new(from, square));
+                return;
+            }
+            let own = self
+                .session
+                .position()
+                .board()
+                .piece_at(square)
+                .is_some_and(|piece| piece.color == self.session.turn());
+            if !own {
+                // Tapped an invalid destination for the selection -
+                // flash the rejected square and keep the selection.
+                self.flash_illegal(MoveRequest::new(from, square));
+                return;
+            }
+            // Otherwise fall through and reselect the tapped own piece.
         }
         // Select own piece, otherwise clear.
         let own = self
@@ -637,10 +795,36 @@ impl GameController {
             }
             MoveOutcome::Illegal { reason } => {
                 warn!("illegal move rejected: {reason}");
-                self.screen.toast(reason);
+                self.rejected_move = Some((request.from, request.to));
+                self.screen.show_message_for(self.session.turn(), reason);
+                self.flash_illegal(request);
             }
         }
         outcome
+    }
+
+    /// Briefly flashes the rejected move's target square red - plus,
+    /// when the naive move would have left the own king in check, the
+    /// threatened king and its attackers.
+    fn flash_illegal(&mut self, request: MoveRequest) {
+        self.illegal_seq += 1;
+        let seq = self.illegal_seq;
+        let mut squares = vec![(request.to, FlashRole::Target)];
+        if let Some(projection) = self.session.projected_check(&request) {
+            squares.push((projection.king, FlashRole::King));
+            squares.extend(projection.attackers.iter().map(|attacker| (*attacker, FlashRole::Attacker)));
+        }
+        self.screen.surface.scene.update(move |state| {
+            state.illegal = Some(IllegalFlash { squares, generation: seq });
+        });
+        let scene = self.screen.surface.scene.clone();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(ILLEGAL_FLASH_MS), move || {
+            scene.update(|state| {
+                if state.illegal.as_ref().is_some_and(|flash| flash.generation == seq) {
+                    state.illegal = None;
+                }
+            });
+        });
     }
 
     /// Shows the promotion picker facing the moving player.
@@ -675,8 +859,13 @@ impl GameController {
         *self.promotion_widget.borrow_mut() = Some(picker.widget.clone());
     }
 
-    /// Undo: logical revert + (M2) physical guide.
+    /// Undo: logical revert + (M2) physical guide. In replay mode the
+    /// button steps the cursor back instead.
     pub fn undo(&mut self) {
+        if self.replay_index.is_some() {
+            self.replay_step(-1);
+            return;
+        }
         if let Some(plan) = self.session.undo() {
             for step in &plan.steps {
                 debug!("undo step: {step:?}");
@@ -685,6 +874,91 @@ impl GameController {
             self.sync_scene();
             self.autosave();
         }
+    }
+
+    /// Redo: re-applies a move undone by `undo`. In replay mode the
+    /// button steps the cursor forward instead.
+    pub fn redo(&mut self) {
+        if self.replay_index.is_some() {
+            self.replay_step(1);
+            return;
+        }
+        if let Some(plan) = self.session.redo() {
+            for step in &plan.steps {
+                debug!("redo step: {step:?}");
+            }
+            self.last_move = None;
+            self.sync_scene();
+            self.autosave();
+        }
+    }
+
+    /// Enters replay mode on a finished game: dismisses the result
+    /// overlay and lets the undo/redo buttons step through the recorded
+    /// plies without mutating the session.
+    pub fn enter_replay(&mut self) {
+        if self.session.phase() != GamePhase::Finished || self.session.ply_count() == 0 {
+            return;
+        }
+        if let Some(widget) = self.result_widget.take() {
+            self.screen.pop_overlay(&widget);
+        }
+        self.replay_index = Some(self.session.ply_count());
+        self.sync_scene();
+    }
+
+    /// Jumps the replay cursor straight to the position after
+    /// `move_index`'s move (score-sheet click, 0-based ply index).
+    /// Enters replay mode implicitly on a finished game.
+    pub fn replay_goto(&mut self, move_index: usize) {
+        if self.session.phase() != GamePhase::Finished {
+            return;
+        }
+        if let Some(widget) = self.result_widget.take() {
+            self.screen.pop_overlay(&widget);
+        }
+        self.replay_index = Some((move_index + 1).min(self.session.ply_count()));
+        self.sync_scene();
+    }
+
+    /// Moves the replay cursor by `delta` plies (clamped).
+    fn replay_step(&mut self, delta: i64) {
+        let Some(index) = self.replay_index else {
+            return;
+        };
+        let next = index.saturating_add_signed(delta as isize).min(self.session.ply_count());
+        self.replay_index = Some(next);
+        self.sync_scene();
+    }
+
+    /// Leaves replay mode and returns to the result overlay.
+    pub fn exit_replay(&mut self) {
+        if self.replay_index.is_none() {
+            return;
+        }
+        self.replay_index = None;
+        self.result_shown = false;
+        self.sync_scene();
+    }
+
+    /// Applies the setup options that are safe to change mid-game
+    /// (board theme, sound, undo) to the running session. Structural
+    /// options (input mode, commit mode, handshake, orientation,
+    /// opponents) only take effect on the next game - they live in
+    /// daemon registrations, field mapping and session setup.
+    pub fn apply_live_config(&mut self, config: &GameConfig) {
+        {
+            let session_config = self.session.config_mut();
+            session_config.theme = config.theme;
+            session_config.sound_enabled = config.sound_enabled;
+            session_config.allow_undo = config.allow_undo;
+        }
+        self.settings.sound_enabled = config.sound_enabled;
+        self.settings.save();
+        self.sound.set_enabled(config.sound_enabled);
+        self.screen.surface.scene.update(|state| state.theme = config.theme);
+        self.sync_scene();
+        self.autosave();
     }
 
     /// Rotates the board one quarter turn clockwise.
@@ -697,7 +971,7 @@ impl GameController {
     fn rotate(&mut self, clockwise: bool) {
         let locked = self.session.config().tangible_mode.uses_tangibles() && self.session.phase() == GamePhase::InProgress;
         if locked {
-            self.screen.toast("rotation locked during play");
+            self.screen.show_message(&self.l10n.msg("game-rotation-locked"));
             return;
         }
         self.screen.rotate_step(clockwise);
@@ -713,6 +987,9 @@ impl GameController {
 
     /// Resign for `color`.
     pub fn resign(&mut self, color: Color) {
+        if self.replay_index.is_some() {
+            return;
+        }
         self.session.resign(color);
         self.sync_scene();
         self.show_result();
@@ -720,6 +997,9 @@ impl GameController {
 
     /// Agree a draw.
     pub fn draw(&mut self) {
+        if self.replay_index.is_some() {
+            return;
+        }
         self.session.agree_draw();
         self.sync_scene();
         self.show_result();
@@ -727,9 +1007,17 @@ impl GameController {
 
     /// Syncs scene + panels + sheets with the session state.
     pub fn sync_scene(&mut self) {
-        let position = self.session.position().clone();
+        // In replay mode the scene shows the cursor's historical
+        // position instead of the live one.
+        let position = self
+            .replay_index
+            .and_then(|index| self.session.position_at(index))
+            .unwrap_or_else(|| self.session.position())
+            .clone();
         let check = position.is_check().then(|| position.board().king_of(position.turn()));
-        let last_move = self.session.san_history().len().gt(&0).then(|| self.last_move_squares()).flatten();
+        let last_move = (self.replay_index.is_none() && self.session.san_history().len().gt(&0))
+            .then(|| self.last_move_squares())
+            .flatten();
         self.screen.surface.scene.update(|state| {
             state.position = Some(position.clone());
             state.check = check.flatten();
@@ -740,18 +1028,44 @@ impl GameController {
         let sans = self.session.san_history();
         self.screen.surface.white_sheet.set_moves(sans);
         self.screen.surface.black_sheet.set_moves(sans);
-        let (turn_text, active) = match self.session.turn() {
+        // In replay mode the cursor's producing move is highlighted:
+        // position after ply `n` comes from move `n - 1`.
+        let active_ply = self.replay_index.and_then(|index| index.checked_sub(1));
+        self.screen.surface.white_sheet.set_active_ply(active_ply);
+        self.screen.surface.black_sheet.set_active_ply(active_ply);
+        let (turn_text, active) = match position.turn() {
             Color::White => (self.l10n.msg("game-white-to-move"), true),
             Color::Black => (self.l10n.msg("game-black-to-move"), false),
         };
         if self.session.phase() == GamePhase::Finished {
-            self.show_result();
+            if let Some(index) = self.replay_index {
+                let label = format!("{} {}/{}", self.l10n.msg("game-replay"), index, self.session.ply_count());
+                self.screen.set_instruction(Color::White, &label);
+                self.screen.set_instruction(Color::Black, &label);
+            } else {
+                self.show_result();
+            }
         } else {
-            self.screen.surface.white_panel.set_status(if active { &turn_text } else { "" });
-            self.screen.surface.black_panel.set_status(if !active { &turn_text } else { "" });
+            self.screen.set_instruction(Color::White, if active { &turn_text } else { "" });
+            self.screen.set_instruction(Color::Black, if !active { &turn_text } else { "" });
         }
         self.screen.surface.white_panel.set_active(active);
         self.screen.surface.black_panel.set_active(!active);
+        let (can_undo, can_redo) = match self.replay_index {
+            // In replay the buttons walk the cursor instead of the undo
+            // stack.
+            Some(index) => (index > 0, index < self.session.ply_count()),
+            None => (self.session.can_undo(), self.session.can_redo()),
+        };
+        self.screen.surface.white_panel.set_undo_enabled(can_undo);
+        self.screen.surface.white_panel.set_redo_enabled(can_redo);
+        self.screen.surface.black_panel.set_undo_enabled(can_undo);
+        self.screen.surface.black_panel.set_redo_enabled(can_redo);
+        let play_enabled = self.replay_index.is_none() && self.session.phase() == GamePhase::InProgress;
+        self.screen.surface.white_panel.set_play_enabled(play_enabled);
+        self.screen.surface.black_panel.set_play_enabled(play_enabled);
+        self.screen.surface.white_panel.set_replay_mode(self.replay_index.is_some());
+        self.screen.surface.black_panel.set_replay_mode(self.replay_index.is_some());
     }
 
     /// Squares of the last applied move (tracked in `apply_request`).
@@ -759,17 +1073,44 @@ impl GameController {
         self.last_move
     }
 
-    /// Presents the game result.
-    fn show_result(&self) {
-        let text = match self.session.outcome() {
+    /// Presents the game result once: a modal, dual-facing overlay
+    /// (outcome icon + confirm button leading to the setup dialog).
+    fn show_result(&mut self) {
+        if self.result_shown {
+            return;
+        }
+        let (text, icon) = match self.session.outcome() {
             Some(KnownOutcome::Decisive { winner }) => match winner {
-                Color::White => self.l10n.msg("game-white-wins"),
-                Color::Black => self.l10n.msg("game-black-wins"),
+                Color::White => (self.l10n.msg("game-white-wins"), icon_names::TCH_TROPHY_SYMBOLIC),
+                Color::Black => (self.l10n.msg("game-black-wins"), icon_names::TCH_TROPHY_SYMBOLIC),
             },
-            Some(KnownOutcome::Draw) => self.l10n.msg("game-drawn"),
+            Some(KnownOutcome::Draw) => {
+                // The overlay states the draw's rule (stalemate,
+                // repetition, material, agreement, ...) when known.
+                let reason = self.session.draw_reason().map(|reason| match reason {
+                    DrawReason::Stalemate => self.l10n.msg("game-draw-stalemate"),
+                    DrawReason::InsufficientMaterial => self.l10n.msg("game-draw-insufficient"),
+                    DrawReason::ThreefoldRepetition => self.l10n.msg("game-draw-threefold"),
+                    DrawReason::FivefoldRepetition => self.l10n.msg("game-draw-fivefold"),
+                    DrawReason::FiftyMoves => self.l10n.msg("game-draw-fifty-moves"),
+                    DrawReason::SeventyFiveMoves => self.l10n.msg("game-draw-seventy-five-moves"),
+                    DrawReason::Agreement => self.l10n.msg("game-draw-agreement"),
+                });
+                let mut text = self.l10n.msg("game-drawn");
+                if let Some(reason) = reason {
+                    text = format!("{text} — {reason}");
+                }
+                (text, icon_names::TCH_HANDSHAKE_SYMBOLIC)
+            }
             None => return,
         };
-        self.screen.toast(&text);
+        self.result_shown = true;
+        let confirm = self.l10n.msg("game-new");
+        let replay = self.l10n.msg("game-replay");
+        let quit = self.l10n.msg("setup-quit");
+        let result = GameResult::new(&text, icon, &confirm, Some(&replay), &quit);
+        self.screen.push_overlay(&result.widget);
+        self.result_widget = Some(result.widget);
     }
 
     /// Writes the autosave file.

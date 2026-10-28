@@ -28,6 +28,15 @@ pub struct GameConfig {
     /// (all 32 pieces on their starting squares) before the game
     /// begins. Disable to debug without a complete physical setup.
     pub require_placement: bool,
+    /// Whether players may take back and replay moves (undo/redo).
+    #[serde(default = "default_true")]
+    pub allow_undo: bool,
+}
+
+/// Field default for `allow_undo` when loading older saved games that
+/// predate the option.
+fn default_true() -> bool {
+    true
 }
 
 impl Default for GameConfig {
@@ -41,6 +50,7 @@ impl Default for GameConfig {
             black: OpponentKind::Human,
             sound_enabled: true,
             require_placement: true,
+            allow_undo: true,
         }
     }
 }

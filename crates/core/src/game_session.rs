@@ -12,6 +12,7 @@ use shakmaty::fen::Fen;
 use shakmaty::san::SanPlus;
 use shakmaty::zobrist::Zobrist64;
 
+use crate::CheckProjection;
 use crate::DrawReason;
 use crate::GameConfig;
 use crate::GameError;
@@ -36,6 +37,9 @@ pub struct GameSession {
     position: Chess,
     /// Previous positions, oldest first (excludes the current one).
     past: Vec<Chess>,
+    /// Undone moves available for redo, latest last: the undone
+    /// position, its zobrist hash and its SAN/UCI strings.
+    future: Vec<(Chess, Zobrist64, String, String)>,
     /// Position hashes incl. initial and current (repetition detection).
     hashes: Vec<Zobrist64>,
     /// SAN strings of played moves.
@@ -58,6 +62,7 @@ impl GameSession {
             hashes: vec![position.zobrist_hash::<Zobrist64>(EnPassantMode::Legal)],
             position,
             past: Vec::new(),
+            future: Vec::new(),
             sans: Vec::new(),
             ucis: Vec::new(),
             resigned: None,
@@ -79,12 +84,22 @@ impl GameSession {
         session.ucis = saved.moves.clone();
         session.resigned = saved.resigned.as_deref().and_then(|s| s.parse::<Color>().ok());
         session.agreed_draw = saved.agreed_draw;
+        // A saved game that already ended restores its finished state;
+        // `begin()` will not resurrect it.
+        session.phase = GamePhase::InProgress;
+        session.finish_if_terminal();
         Ok(session)
     }
 
     /// The configuration this session was created with.
     pub fn config(&self) -> &GameConfig {
         &self.config
+    }
+
+    /// Mutable access to the configuration - for applying live-safe
+    /// option changes (theme, sound, undo) to a running game.
+    pub fn config_mut(&mut self) -> &mut GameConfig {
+        &mut self.config
     }
 
     /// Current lifecycle phase.
@@ -96,6 +111,9 @@ impl GameSession {
     /// `NoTangibles` - and when `require_placement` is off, tangibles
     /// start immediately without the physical-setup handshake.
     pub fn begin(&mut self) {
+        if self.phase == GamePhase::Finished {
+            return;
+        }
         self.phase = if self.config.tangible_mode.uses_tangibles() && self.config.require_placement {
             GamePhase::AwaitingPlacement
         } else {
@@ -114,6 +132,24 @@ impl GameSession {
     /// The live position.
     pub fn position(&self) -> &Chess {
         &self.position
+    }
+
+    /// Number of plies played.
+    pub fn ply_count(&self) -> usize {
+        self.past.len()
+    }
+
+    /// The position after `ply` moves (`0` is the initial position,
+    /// `ply_count()` the current one) - for stepping through the game
+    /// record in replay mode.
+    pub fn position_at(&self, ply: usize) -> Option<&Chess> {
+        if ply < self.past.len() {
+            self.past.get(ply)
+        } else if ply == self.past.len() {
+            Some(&self.position)
+        } else {
+            None
+        }
     }
 
     /// Side to move.
@@ -180,6 +216,7 @@ impl GameSession {
         match self.position.clone().play(mv) {
             Ok(next) => {
                 let san = SanPlus::from_move(self.position.clone(), mv).to_string();
+                self.future.clear();
                 self.past.push(self.position.clone());
                 self.position = next.clone();
                 self.hashes.push(next.zobrist_hash::<Zobrist64>(EnPassantMode::Legal));
@@ -192,19 +229,67 @@ impl GameSession {
         }
     }
 
+    /// Projects `request` naively (ignoring legality) and reports the
+    /// check it would leave on the mover's own king, if any - the
+    /// reason a move like "pinned piece" or "king into an attacked
+    /// square" is illegal.
+    ///
+    /// Simplifications: castling maps to the king move only and an en
+    /// passant capture keeps the captured pawn - both irrelevant for
+    /// the check question in practice.
+    pub fn projected_check(&self, request: &MoveRequest) -> Option<CheckProjection> {
+        let piece = self.position.board().piece_at(request.from)?;
+        if piece.color != self.turn() {
+            return None;
+        }
+        let mut board = self.position.board().clone();
+        board.discard_piece_at(request.from);
+        board.set_piece_at(request.to, piece);
+        let king = board.king_of(piece.color)?;
+        let attackers: Vec<Square> = board.attacks_to(king, piece.color.other(), board.occupied()).into_iter().collect();
+        (!attackers.is_empty()).then_some(CheckProjection { king, attackers })
+    }
+
+    /// Whether an undo is currently possible: allowed by the config,
+    /// the game is running and there is a move to take back.
+    pub fn can_undo(&self) -> bool {
+        self.config.allow_undo && self.phase == GamePhase::InProgress && !self.past.is_empty()
+    }
+
+    /// Whether a redo is currently possible.
+    pub fn can_redo(&self) -> bool {
+        self.config.allow_undo && self.phase == GamePhase::InProgress && !self.future.is_empty()
+    }
+
     /// Pops the last move, returning the [`UndoPlan`] describing the
-    /// physical restoration. `None` when nothing was played or the game
-    /// is finished.
+    /// physical restoration. `None` when undo is not allowed, nothing
+    /// was played or the game is finished.
     pub fn undo(&mut self) -> Option<UndoPlan> {
-        if self.phase == GamePhase::Finished || self.past.is_empty() {
+        if !self.can_undo() {
             return None;
         }
         let current = self.position.clone();
         self.position = self.past.pop()?;
-        self.hashes.pop();
-        self.sans.pop();
-        self.ucis.pop();
+        let hash = self.hashes.pop()?;
+        let san = self.sans.pop()?;
+        let uci = self.ucis.pop()?;
+        self.future.push((current.clone(), hash, san, uci));
         Some(UndoPlan::between(&self.position, &current))
+    }
+
+    /// Re-applies the last undone move. `None` when nothing is
+    /// available to redo.
+    pub fn redo(&mut self) -> Option<UndoPlan> {
+        if !self.can_redo() {
+            return None;
+        }
+        let (position, hash, san, uci) = self.future.pop()?;
+        let current = std::mem::replace(&mut self.position, position.clone());
+        self.past.push(current.clone());
+        self.hashes.push(hash);
+        self.sans.push(san);
+        self.ucis.push(uci);
+        Some(UndoPlan::between(&position, &current))
     }
 
     /// Terminal outcome per shakmaty (mate, stalemate, material) plus
@@ -230,6 +315,22 @@ impl GameSession {
             reasons.push(DrawReason::FiftyMoves);
         }
         reasons
+    }
+
+    /// Why the game ended drawn (agreement, an automatic rule, or
+    /// stalemate), for result presentation. `None` while the game is
+    /// ongoing or was decided.
+    pub fn draw_reason(&self) -> Option<DrawReason> {
+        if self.phase != GamePhase::Finished {
+            return None;
+        }
+        if self.agreed_draw {
+            return Some(DrawReason::Agreement);
+        }
+        if let Some(reason) = self.automatic_draw() {
+            return Some(reason);
+        }
+        self.position.is_stalemate().then_some(DrawReason::Stalemate)
     }
 
     /// Automatic (unconditional) draw, if any applies.
@@ -302,6 +403,7 @@ fn promotion_role(mv: &Move) -> Option<Role> {
 
 #[cfg(test)]
 mod tests {
+    use shakmaty::Chess;
     use shakmaty::Color;
     use shakmaty::Position;
     use shakmaty::Role;
@@ -399,6 +501,96 @@ mod tests {
         assert!(!plan.is_empty());
         assert_eq!(session.san_history().len(), 0);
         assert_eq!(session.turn(), Color::White);
+    }
+
+    #[test]
+    fn undo_disabled_blocks_takebacks() {
+        let mut session = GameSession::new(GameConfig {
+            allow_undo: false,
+            ..GameConfig::default()
+        });
+        session.begin();
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        assert!(!session.can_undo());
+        assert!(session.undo().is_none());
+        assert!(session.redo().is_none());
+        assert_eq!(session.san_history().len(), 1);
+    }
+
+    #[test]
+    fn redo_replays_undone_moves() {
+        let mut session = session();
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        session.request_move(MoveRequest::new(Square::E7, Square::E5));
+        assert!(session.undo().is_some());
+        assert!(session.can_redo());
+        assert!(session.redo().is_some());
+        assert_eq!(session.san_history(), &["e4".to_string(), "e5".to_string()]);
+        assert_eq!(session.turn(), Color::White);
+        assert!(!session.can_redo());
+    }
+
+    #[test]
+    fn new_move_clears_redo_stack() {
+        let mut session = session();
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        session.request_move(MoveRequest::new(Square::E7, Square::E5));
+        session.undo();
+        session.request_move(MoveRequest::new(Square::C7, Square::C5));
+        assert!(!session.can_redo());
+        assert_eq!(session.san_history(), &["e4".to_string(), "c5".to_string()]);
+    }
+
+    #[test]
+    fn projected_check_names_king_and_attackers() {
+        let mut session = session();
+        // Bb4 pins Nc3 against the e1 king on the b4-c3-d2-e1 diagonal
+        // (d2 vacated by 2. d4).
+        for mv in ["b1c3", "e7e5", "d2d4", "e5d4", "e2e4", "f8b4"] {
+            assert!(matches!(
+                session.request_move(MoveRequest::new(mv[..2].parse().expect("sq"), mv[2..].parse().expect("sq"))),
+                MoveOutcome::Applied { .. }
+            ));
+        }
+        // Moving the pinned knight off the diagonal exposes the king.
+        let projection = session
+            .projected_check(&MoveRequest::new(Square::C3, Square::E4))
+            .expect("pinned move exposes check");
+        assert_eq!(projection.king, Square::E1);
+        assert_eq!(projection.attackers, vec![Square::B4]);
+        // A king step off the diagonal leaves no check - no projection.
+        assert!(session.projected_check(&MoveRequest::new(Square::E1, Square::E2)).is_none());
+    }
+
+    #[test]
+    fn position_at_steps_through_history() {
+        let mut session = session();
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        session.request_move(MoveRequest::new(Square::E7, Square::E5));
+        assert_eq!(session.ply_count(), 2);
+        assert_eq!(session.position_at(0), Some(&Chess::default()));
+        assert_eq!(session.position_at(2), Some(session.position()));
+        assert!(session.position_at(3).is_none());
+        assert_eq!(session.position_at(1).map(|position| position.turn()), Some(Color::Black));
+    }
+
+    #[test]
+    fn restored_finished_game_stays_finished() {
+        let mut session = session();
+        // Scholar's mate ends decisively inside four plies.
+        for mv in ["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5f7"] {
+            assert!(matches!(
+                session.request_move(MoveRequest::new(mv[..2].parse().expect("sq"), mv[2..].parse().expect("sq"))),
+                MoveOutcome::Applied { .. }
+            ));
+        }
+        assert_eq!(session.phase(), GamePhase::Finished);
+        let restored = GameSession::from_saved(&session.to_saved()).expect("restore");
+        assert_eq!(restored.phase(), GamePhase::Finished);
+        // `begin` must not resurrect the finished game.
+        let mut resurrected = restored;
+        resurrected.begin();
+        assert_eq!(resurrected.phase(), GamePhase::Finished);
     }
 
     #[test]

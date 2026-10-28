@@ -29,6 +29,8 @@ pub enum CommandKind {
     AgreeDraw,
     /// Placement-gate status (tangible modes): placed/missing/foreign.
     PlacementStatus,
+    /// Window screenshot as a PNG (base64 in the JSON reply).
+    Screenshot,
 }
 
 /// A command plus the channel back to the waiting tool call.

@@ -15,4 +15,6 @@ pub enum BoardTheme {
     Slate,
     /// Tournament felt green.
     TournamentGreen,
+    /// Pale and dark marble stone.
+    Marble,
 }

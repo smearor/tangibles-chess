@@ -41,12 +41,6 @@ impl AppWindow {
         let stack = gtk4::Stack::new();
         stack.set_transition_type(gtk4::StackTransitionType::Crossfade);
 
-        let new_game = gio::SimpleAction::new("new-game", None);
-        new_game.connect_activate({
-            let stack = stack.clone();
-            move |_, _| stack.set_visible_child_name("setup")
-        });
-        window.add_action(&new_game);
         app.set_accels_for_action("win.new-game", &["<Control>n"]);
 
         let saved = Self::load_autosave();
@@ -71,15 +65,41 @@ impl AppWindow {
                 }
             },
         ));
-        // The dual-facing setup page is tall by design (one card per
-        // table edge); a scroll viewport keeps it usable on monitors
-        // that are smaller than its natural height.
-        let setup_scroll = gtk4::ScrolledWindow::new();
-        setup_scroll.set_child(Some(&setup.widget));
-        setup_scroll.set_hscrollbar_policy(gtk4::PolicyType::Never);
-        setup_scroll.set_propagate_natural_height(false);
-        stack.add_named(&setup_scroll, Some("setup"));
+        // Setup changes apply the live-safe options (theme, sound,
+        // undo) to a running game immediately.
+        setup.set_live_config_callback(Rc::new(|config| with_controller(|c| c.borrow_mut().apply_live_config(config))));
+        // The setup page scrolls inside each facing half - no outer
+        // viewport needed (each card stays within its half of the
+        // surface on small screens).
+        stack.add_named(&setup.widget, Some("setup"));
         window.set_content(Some(&stack));
+
+        // Switching to the setup page does not destroy a running game:
+        // its screen stays in the stack and the controller keeps
+        // processing tangible input. "back-to-game" returns to it.
+        let new_game = gio::SimpleAction::new("new-game", None);
+        new_game.connect_activate({
+            let stack = stack.clone();
+            let setup = setup.clone();
+            move |_, _| {
+                setup.set_game_running(stack.child_by_name("game").is_some());
+                stack.set_visible_child_name("setup");
+            }
+        });
+        window.add_action(&new_game);
+        let back_to_game = gio::SimpleAction::new("back-to-game", None);
+        back_to_game.connect_activate({
+            let stack = stack.clone();
+            move |_, _| stack.set_visible_child_name("game")
+        });
+        window.add_action(&back_to_game);
+        let replay = gio::SimpleAction::new("replay", None);
+        replay.connect_activate(|_, _| with_controller(|controller| controller.borrow_mut().enter_replay()));
+        window.add_action(&replay);
+        let screenshot = gio::SimpleAction::new("screenshot", None);
+        screenshot.connect_activate(|_, _| with_controller(|controller| controller.borrow_mut().screenshot()));
+        window.add_action(&screenshot);
+        app.set_accels_for_action("win.screenshot", &["<Control><Shift>s"]);
 
         // The MCP endpoint binds at launch, not per game: the handshake
         // phase is exactly what remote agents want to watch, and the
@@ -135,9 +155,11 @@ impl AppWindow {
 
         let actions = PanelActions {
             on_undo: Some(Rc::new(|| with_controller(|c| c.borrow_mut().undo()))),
+            on_redo: Some(Rc::new(|| with_controller(|c| c.borrow_mut().redo()))),
             on_draw: Some(Rc::new(|| with_controller(|c| c.borrow_mut().draw()))),
             on_resign: Some(Rc::new(|color| with_controller(|c| c.borrow_mut().resign(color)))),
             on_rotate: Some(Rc::new(|| with_controller(|c| c.borrow_mut().rotate_cw()))),
+            on_exit_replay: Some(Rc::new(|| with_controller(|c| c.borrow_mut().exit_replay()))),
         };
 
         let screen = Rc::new(GameScreen::new(&actions, &l10n, &config));

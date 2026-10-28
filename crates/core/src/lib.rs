@@ -7,6 +7,7 @@
 
 mod board_orientation;
 mod board_theme;
+mod check_projection;
 mod commit_mode;
 mod draw_reason;
 mod game_config;
@@ -23,6 +24,7 @@ mod undo_step;
 
 pub use board_orientation::BoardOrientation;
 pub use board_theme::BoardTheme;
+pub use check_projection::CheckProjection;
 pub use commit_mode::CommitMode;
 pub use draw_reason::DrawReason;
 pub use game_config::GameConfig;

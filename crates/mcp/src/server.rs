@@ -115,6 +115,39 @@ impl ChessMcp {
     async fn placement_status(&self) -> Result<CallToolResult, ErrorData> {
         self.dispatch(CommandKind::PlacementStatus).await
     }
+
+    /// PNG screenshot of the application window.
+    #[tool(description = "Take a screenshot of the app window; returns a PNG image.")]
+    async fn screenshot(&self) -> Result<CallToolResult, ErrorData> {
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(GameRequest {
+                command: CommandKind::Screenshot,
+                reply,
+            })
+            .await
+            .map_err(|_| ErrorData::internal_error("game controller channel closed", None))?;
+        match rx.await {
+            Ok(value) => {
+                let png = value.get("png_base64").and_then(|png| png.as_str());
+                let Some(png) = png else {
+                    return Ok(CallToolResult::error(vec![ContentBlock::text(
+                        value.get("error").and_then(|e| e.as_str()).unwrap_or("no screenshot produced").to_string(),
+                    )]));
+                };
+                let meta = format!(
+                    "{}x{}",
+                    value.get("width").and_then(|w| w.as_u64()).unwrap_or(0),
+                    value.get("height").and_then(|h| h.as_u64()).unwrap_or(0)
+                );
+                Ok(CallToolResult::success(vec![
+                    ContentBlock::image(png.to_string(), "image/png".to_string()),
+                    ContentBlock::text(format!("screenshot ({meta})")),
+                ]))
+            }
+            Err(_) => Ok(CallToolResult::error(vec![ContentBlock::text("controller dropped the request".to_string())])),
+        }
+    }
 }
 
 #[tool_handler]

@@ -19,4 +19,6 @@ pub enum DrawReason {
     InsufficientMaterial,
     /// Both players agreed.
     Agreement,
+    /// The side to move has no legal move and is not in check.
+    Stalemate,
 }

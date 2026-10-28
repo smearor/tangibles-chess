@@ -17,6 +17,11 @@ impl SoundPlayer {
         Self { enabled: Cell::new(enabled) }
     }
 
+    /// Toggles playback (sound is a global app setting, live-applied).
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.set(enabled);
+    }
+
     /// Plays a named sound resource if present.
     pub fn play(&self, name: &str) {
         if !self.enabled.get() {
