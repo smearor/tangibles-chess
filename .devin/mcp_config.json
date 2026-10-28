@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "tangibles-chess": {
+      "url": "http://127.0.0.1:9090/mcp"
+    }
+  }
+}
