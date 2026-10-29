@@ -32,11 +32,9 @@ setup-resume-moves = Züge gespielt
 setup-back-to-game = Zurück zur Partie
 
 # Board-Check / Handshake
-check-heading = Figuren aufstellen
-check-progress = { $placed } von { $total } Figuren platziert
 check-missing = Stelle eine Figur auf { $square }
 check-unexpected = Nimm die Figur von { $square }
-check-complete = Brett vollständig – Partie startet
+check-ready = Bereit
 
 # Im Spiel
 game-white-to-move = Weiß am Zug

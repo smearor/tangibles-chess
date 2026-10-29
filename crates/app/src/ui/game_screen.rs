@@ -11,7 +11,6 @@ use tangibles_chess_core::BoardOrientation;
 use tangibles_chess_core::GameConfig;
 
 use crate::l10n::L10n;
-use crate::ui::board_check::BoardCheckOverlay;
 use crate::ui::player_panel::PanelActions;
 use crate::ui::tabletop_surface::TabletopSurface;
 
@@ -25,7 +24,6 @@ pub struct GameScreen {
     /// The outer rotation container.
     pub rotation: RotationWidget,
     /// Start-handshake overlay.
-    pub board_check: BoardCheckOverlay,
     /// Daemon status banner.
     pub daemon_banner: adw::Banner,
     /// Overlay layer for pickers/dialogs.
@@ -96,9 +94,6 @@ impl GameScreen {
         let overlay = gtk4::Overlay::new();
         overlay.set_child(Some(&rotation));
 
-        let board_check = BoardCheckOverlay::new(l10n);
-        overlay.add_overlay(&board_check.widget);
-
         let daemon_banner = adw::Banner::new(&l10n.msg("daemon-offline"));
         daemon_banner.set_revealed(false);
 
@@ -116,7 +111,6 @@ impl GameScreen {
             widget,
             surface,
             rotation,
-            board_check,
             daemon_banner,
             overlay,
             orientation: std::cell::Cell::new(config.orientation),

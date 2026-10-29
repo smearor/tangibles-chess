@@ -32,11 +32,9 @@ setup-resume-moves = moves played
 setup-back-to-game = Back to game
 
 # Board check / handshake
-check-heading = Place the pieces
-check-progress = { $placed } of { $total } pieces placed
 check-missing = Place a piece on { $square }
 check-unexpected = Remove the piece from { $square }
-check-complete = Board complete - game starts
+check-ready = Ready
 
 # In-game
 game-white-to-move = White to move

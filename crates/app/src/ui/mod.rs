@@ -1,7 +1,6 @@
 //! Widget tree of the tabletop surface and the app screens.
 
 pub mod app_window;
-pub mod board_check;
 pub mod chess_scene;
 pub mod dual_facing_row;
 pub mod game_result;

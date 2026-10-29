@@ -35,6 +35,7 @@ use tangibles_chess_tangibles::MockSource;
 use tangibles_chess_tangibles::MoveInference;
 use tangibles_chess_tangibles::OccupancyProbe;
 use tangibles_chess_tangibles::PlacementGate;
+use tangibles_chess_tangibles::PlacementStatus;
 use tangibles_chess_tangibles::TableEdge;
 use tangibles_chess_tangibles::TangibleSource;
 use tangibles_chess_tangibles::ZoneAction;
@@ -582,18 +583,48 @@ impl GameController {
 
     /// Placement gate evaluation during the start handshake.
     fn update_placement(&mut self) {
+        if self.session.phase() != GamePhase::AwaitingPlacement {
+            return;
+        }
         let status = self.gate.check(self.session.position(), &self.probe);
-        self.screen.board_check.set_status(&status, &self.l10n);
         self.screen.surface.scene.update(|state| {
             state.missing = status.missing.clone();
             state.foreign = status.unexpected.clone();
             state.ceremony = status.correct.iter().copied().collect();
         });
+        // Per-side status lines: each player only sees what concerns
+        // them - own placed count, own missing pieces, shared extras.
+        let position = self.session.position().clone();
+        for color in [Color::White, Color::Black] {
+            let own = |square: Square| position.board().piece_at(square).is_some_and(|piece| piece.color == color);
+            let placed = status.correct.iter().copied().filter(|square| own(*square)).count();
+            let missing: Vec<Square> = status.missing.iter().copied().filter(|square| own(*square)).collect();
+            let text = self.placement_line(placed, &missing, &status);
+            self.screen.set_instruction(color, &text);
+        }
         if status.is_consistent() {
             self.session.confirm_placement();
             info!("placement gate satisfied - game starts");
             self.sync_scene();
         }
+    }
+
+    /// One side's handshake status line: `placed/total` plus the first
+    /// own missing hint and the first extra-piece hint - or `Ready`
+    /// once this side has nothing left to fix.
+    fn placement_line(&self, placed: usize, own_missing: &[Square], status: &PlacementStatus) -> String {
+        if own_missing.is_empty() && status.unexpected.is_empty() {
+            return self.l10n.msg("check-ready").to_string();
+        }
+        let mut parts = vec![format!("{placed}/{}", placed + own_missing.len())];
+        for (key, square) in [("check-missing", own_missing.first()), ("check-unexpected", status.unexpected.first())] {
+            if let Some(square) = square {
+                let mut args = fluent::FluentArgs::new();
+                args.set("square", square.to_string());
+                parts.push(self.l10n.msg_args(key, &args).to_string());
+            }
+        }
+        parts.join(" - ")
     }
 
     /// Field events during the game: move inference and zones.
@@ -1061,6 +1092,8 @@ impl GameController {
             } else {
                 self.show_result();
             }
+        } else if self.session.phase() == GamePhase::AwaitingPlacement {
+            self.update_placement();
         } else {
             self.screen.set_instruction(Color::White, if active { &turn_text } else { "" });
             self.screen.set_instruction(Color::Black, if !active { &turn_text } else { "" });
