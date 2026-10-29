@@ -7,10 +7,25 @@ use std::sync::Arc;
 use rmcp::ErrorData;
 use rmcp::ServerHandler;
 use rmcp::handler::server::wrapper::Parameters;
+use std::sync::Mutex;
+
+use rmcp::RoleServer;
 use rmcp::model::CallToolResult;
 use rmcp::model::ContentBlock;
+use rmcp::model::ListResourcesResult;
+use rmcp::model::PaginatedRequestParams;
+use rmcp::model::ReadResourceRequestParams;
+use rmcp::model::ReadResourceResponse;
+use rmcp::model::ReadResourceResult;
+use rmcp::model::Resource;
+use rmcp::model::ResourceContents;
+use rmcp::model::ResourceUpdatedNotificationParam;
 use rmcp::model::ServerCapabilities;
 use rmcp::model::ServerConfig;
+use rmcp::model::SubscribeRequestParams;
+use rmcp::model::UnsubscribeRequestParams;
+use rmcp::service::Peer;
+use rmcp::service::RequestContext;
 use rmcp::tool;
 use rmcp::tool_handler;
 use rmcp::tool_router;
@@ -26,11 +41,17 @@ use tracing::info;
 use crate::CommandKind;
 use crate::GameRequest;
 
+/// `(uri, peer)` pairs that subscribed via `resources/subscribe` and
+/// receive `notifications/resources/updated` on each state change.
+type ResourceSubscribers = Arc<Mutex<Vec<(String, Peer<RoleServer>)>>>;
+
 /// MCP server bridging the GTK game controller to remote tools.
 #[derive(Clone)]
 struct ChessMcp {
     /// Command channel into the GTK main loop.
     tx: async_channel::Sender<GameRequest>,
+    /// Live resource subscriptions; see [`ResourceSubscribers`].
+    subscribers: ResourceSubscribers,
 }
 
 impl ChessMcp {
@@ -153,11 +174,69 @@ impl ChessMcp {
 #[tool_handler]
 impl ServerHandler for ChessMcp {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
+        ServerConfig::new(
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .enable_resources_subscribe()
+                .build(),
+        )
+        .with_instructions(
             "Tangibles Chess - tabletop chess on the tangible-objects surface. \
              Tools introspect the live game (state, legal moves, placement \
-             handshake) and control it (make_move, undo, resign, agree_draw).",
+             handshake) and control it (make_move, undo, resign, agree_draw). \
+             The chess://game-state resource mirrors the game_state tool and \
+             supports resources/subscribe for change notifications.",
         )
+    }
+
+    fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> {
+        std::future::ready(Ok(ListResourcesResult::with_all_items(vec![
+            Resource::new(crate::GAME_STATE_URI, "game-state")
+                .with_title("Live game state")
+                .with_description("Current game snapshot: phase, turn, FEN, SAN history and outcome.")
+                .with_mime_type("application/json"),
+        ])))
+    }
+
+    // `tool_handler` rewrites `async fn` back into `fn -> impl Future`,
+    // which trips manual_async_fn on the generated code.
+    #[allow(clippy::manual_async_fn)]
+    async fn read_resource(&self, request: ReadResourceRequestParams, _context: RequestContext<RoleServer>) -> Result<ReadResourceResponse, ErrorData> {
+        if request.uri != crate::GAME_STATE_URI {
+            return Err(ErrorData::invalid_params(format!("unknown resource {}", request.uri), None));
+        }
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(GameRequest {
+                command: CommandKind::GameState,
+                reply,
+            })
+            .await
+            .map_err(|_| ErrorData::internal_error("game controller channel closed", None))?;
+        let value = rx.await.map_err(|_| ErrorData::internal_error("controller dropped the request", None))?;
+        let text = serde_json::to_string_pretty(&value).map_err(|err| ErrorData::internal_error(format!("json: {err}"), None))?;
+        Ok(ReadResourceResult::new(vec![ResourceContents::text(text, crate::GAME_STATE_URI).with_mime_type("application/json")]).into())
+    }
+
+    #[allow(deprecated)]
+    fn subscribe(&self, request: SubscribeRequestParams, context: RequestContext<RoleServer>) -> impl std::future::Future<Output = Result<(), ErrorData>> {
+        if let Ok(mut subscribers) = self.subscribers.lock() {
+            subscribers.push((request.uri, context.peer.clone()));
+        }
+        std::future::ready(Ok(()))
+    }
+
+    #[allow(deprecated)]
+    fn unsubscribe(&self, request: UnsubscribeRequestParams, _context: RequestContext<RoleServer>) -> impl std::future::Future<Output = Result<(), ErrorData>> {
+        if let Ok(mut subscribers) = self.subscribers.lock() {
+            subscribers.retain(|(uri, _)| uri != &request.uri);
+        }
+        std::future::ready(Ok(()))
     }
 }
 
@@ -166,7 +245,11 @@ impl ServerHandler for ChessMcp {
 ///
 /// The default host allowlist is localhost-only - LAN deployments must
 /// allow their own bound address.
-pub fn spawn_http(tx: async_channel::Sender<GameRequest>, addr: SocketAddr) -> std::thread::JoinHandle<()> {
+pub fn spawn_http(
+    tx: async_channel::Sender<GameRequest>,
+    addr: SocketAddr,
+    state_watch: tokio::sync::watch::Receiver<serde_json::Value>,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let runtime = match tokio::runtime::Runtime::new() {
             Ok(runtime) => runtime,
@@ -192,7 +275,31 @@ pub fn spawn_http(tx: async_channel::Sender<GameRequest>, addr: SocketAddr) -> s
                 ];
                 StreamableHttpServerConfig::default().with_allowed_hosts(allowed_hosts)
             };
-            let service = StreamableHttpService::new(move || Ok(ChessMcp { tx: tx.clone() }), Arc::new(LocalSessionManager::default()), config);
+            let subscribers = Arc::new(Mutex::new(Vec::new()));
+            // Forward every game-state change to subscribed peers as
+            // `notifications/resources/updated`.
+            tokio::spawn({
+                let subscribers = subscribers.clone();
+                let mut state_watch = state_watch;
+                async move {
+                    while state_watch.changed().await.is_ok() {
+                        let peers: Vec<(String, Peer<RoleServer>)> = subscribers.lock().map(|subs| subs.clone()).unwrap_or_default();
+                        for (uri, peer) in peers {
+                            let _ = peer.notify_resource_updated(ResourceUpdatedNotificationParam::new(uri)).await;
+                        }
+                    }
+                }
+            });
+            let service = StreamableHttpService::new(
+                move || {
+                    Ok(ChessMcp {
+                        tx: tx.clone(),
+                        subscribers: subscribers.clone(),
+                    })
+                },
+                Arc::new(LocalSessionManager::default()),
+                config,
+            );
             let app = axum::Router::new().route_service("/mcp", service);
             let listener = match tokio::net::TcpListener::bind(addr).await {
                 Ok(listener) => listener,

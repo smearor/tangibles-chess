@@ -12,3 +12,7 @@ mod server;
 pub use command::CommandKind;
 pub use command::GameRequest;
 pub use server::spawn_http;
+
+/// URI of the live game-state resource (`resources/read` +
+/// `resources/subscribe` stream).
+pub const GAME_STATE_URI: &str = "chess://game-state";

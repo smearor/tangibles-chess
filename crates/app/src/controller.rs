@@ -116,6 +116,10 @@ thread_local! {
     /// The active controller, reachable from widget callbacks that do
     /// not hold it directly (promotion picker, panel actions).
     static ACTIVE_CONTROLLER: RefCell<Option<Rc<RefCell<GameController>>>> = const { RefCell::new(None) };
+
+    /// Latest-state channel feeding MCP `chess://game-state` resource
+    /// subscribers; installed by `attach_mcp`.
+    static MCP_STATE_WATCH: RefCell<Option<tokio::sync::watch::Sender<serde_json::Value>>> = const { RefCell::new(None) };
 }
 
 /// Registers the running controller globally (single window app).
@@ -269,7 +273,7 @@ impl GameController {
     /// allocation - before that, `board_rect_mm` has nothing to scale
     /// and would register a degenerate board. Polls a few times, then
     /// logs and gives up.
-    fn register_when_ready(controller: Rc<RefCell<Self>>) {
+    pub(crate) fn register_when_ready(controller: Rc<RefCell<Self>>) {
         let mut tries = 0u8;
         glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
             tries += 1;
@@ -321,7 +325,9 @@ impl GameController {
     /// endpoint replies `{"error": "no active game"}`.
     pub fn attach_mcp(addr: std::net::SocketAddr) {
         let (tx, rx) = async_channel::unbounded::<tangibles_chess_mcp::GameRequest>();
-        tangibles_chess_mcp::spawn_http(tx, addr);
+        let (watch_tx, watch_rx) = tokio::sync::watch::channel(serde_json::json!({}));
+        MCP_STATE_WATCH.with(|slot| *slot.borrow_mut() = Some(watch_tx));
+        tangibles_chess_mcp::spawn_http(tx, addr, watch_rx);
         glib::MainContext::default().spawn_local(async move {
             while let Ok(request) = rx.recv().await {
                 let mut reply = serde_json::json!({ "error": "no active game" });
@@ -479,6 +485,16 @@ impl GameController {
             tracing::info!("screenshot saved to {}", path.display());
             self.screen.show_message(&self.l10n.msg("game-screenshot-saved"));
         }
+    }
+
+    /// Pushes a fresh state snapshot to MCP `chess://game-state` resource
+    /// subscribers, if the endpoint and any subscribers exist.
+    fn notify_mcp_state(&self) {
+        MCP_STATE_WATCH.with(|slot| {
+            if let Some(tx) = slot.borrow().as_ref() {
+                let _ = tx.send(self.mcp_game_state());
+            }
+        });
     }
 
     /// Game-state snapshot for the MCP `game_state` tool.
@@ -1066,6 +1082,7 @@ impl GameController {
         self.screen.surface.black_panel.set_play_enabled(play_enabled);
         self.screen.surface.white_panel.set_replay_mode(self.replay_index.is_some());
         self.screen.surface.black_panel.set_replay_mode(self.replay_index.is_some());
+        self.notify_mcp_state();
     }
 
     /// Squares of the last applied move (tracked in `apply_request`).
