@@ -57,7 +57,7 @@ impl FieldSetBuilder {
         let (ww, wh) = self.window_mm;
         let zero = Millimeters::new(0.0);
         let gap = Millimeters::new(4.0);
-        let bs = mm_max(mm_min(mm_min(bs, ww - bx), wh - by), zero);
+        let bs = bs.min(ww - bx).min(wh - by).max(zero);
         let cell = bs * 0.125;
         let mut fields = Vec::with_capacity(64 + 6);
         for index in 0..64 {
@@ -76,12 +76,12 @@ impl FieldSetBuilder {
         // shorter than `zone`, the tray collapses to the empty region at
         // `wh` - a zero-height region never overlaps.
         let south_top = by + bs + gap;
-        let south_confirm_h = mm_min(mm_max(wh - south_top, zero), zone);
+        let south_confirm_h = (wh - south_top).max(zero).min(zone);
         fields.push(Self::field(crate::ZONE_BTN_SOUTH, bx + bs * 0.35, south_top, bx + bs * 0.65, south_top + south_confirm_h));
-        fields.push(Self::field(crate::ZONE_TRAY_SOUTH, bx, mm_min(south_top + south_confirm_h, wh), bx + bs, wh));
+        fields.push(Self::field(crate::ZONE_TRAY_SOUTH, bx, (south_top + south_confirm_h).min(wh), bx + bs, wh));
         // North side, mirrored: confirm strip just above the board.
-        let north_bottom = mm_max(by - gap, zero);
-        let north_confirm_h = mm_min(north_bottom, zone);
+        let north_bottom = (by - gap).max(zero);
+        let north_confirm_h = north_bottom.min(zone);
         fields.push(Self::field(
             crate::ZONE_BTN_NORTH,
             bx + bs * 0.35,
@@ -108,17 +108,6 @@ impl FieldSetBuilder {
             suppress: true,
         }
     }
-}
-
-/// `Millimeters` is only `PartialOrd` (f64 NaN) - these are the `min` /
-/// `max` helpers `Ord` types would have.
-fn mm_min(a: Millimeters, b: Millimeters) -> Millimeters {
-    if a <= b { a } else { b }
-}
-
-/// See [`mm_min`].
-fn mm_max(a: Millimeters, b: Millimeters) -> Millimeters {
-    if a >= b { a } else { b }
 }
 
 #[cfg(test)]
