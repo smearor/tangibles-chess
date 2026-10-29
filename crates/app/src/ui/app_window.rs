@@ -16,6 +16,7 @@ use crate::controller::set_active_controller;
 use crate::controller::with_controller;
 use crate::l10n::L10n;
 use crate::settings::AppSettings;
+use crate::tangible_host::TangibleHost;
 use crate::ui::game_screen::GameScreen;
 use crate::ui::player_panel::PanelActions;
 use crate::ui::setup_screen::SetupScreen;
@@ -74,6 +75,20 @@ impl AppWindow {
         stack.add_named(&setup.widget, Some("setup"));
         window.set_content(Some(&stack));
 
+        // A crashed or killed previous run can leave the `chess` field
+        // set registered on the daemon; its suppression would swallow
+        // the setup dialog's button taps. One-shot startup cleanup on a
+        // side thread - no controller exists yet in setup.
+        if settings.last_config.tangible_mode.uses_tangibles() && !mock {
+            let url = settings.daemon_url.clone();
+            std::thread::spawn(move || {
+                let cleanup = TangibleHost::new().ok().and_then(|host| host.connect(&url).ok().map(|source| (host, source)));
+                if let Some((host, source)) = cleanup {
+                    let _ = host.unregister(&source);
+                }
+            });
+        }
+
         // Switching to the setup page does not destroy a running game:
         // its screen stays in the stack and the controller keeps
         // processing tangible input. "back-to-game" returns to it.
@@ -82,6 +97,10 @@ impl AppWindow {
             let stack = stack.clone();
             let setup = setup.clone();
             move |_, _| {
+                // The board's field set suppresses every touch inside its
+                // regions - while the setup dialog is shown it would swallow
+                // the button clicks. Release it; back-to-game re-registers.
+                with_controller(|controller| controller.borrow_mut().release_registrations());
                 setup.set_game_running(stack.child_by_name("game").is_some());
                 stack.set_visible_child_name("setup");
             }
@@ -90,7 +109,10 @@ impl AppWindow {
         let back_to_game = gio::SimpleAction::new("back-to-game", None);
         back_to_game.connect_activate({
             let stack = stack.clone();
-            move |_, _| stack.set_visible_child_name("game")
+            move |_, _| {
+                with_controller(|controller| GameController::register_when_ready(controller.clone()));
+                stack.set_visible_child_name("game");
+            }
         });
         window.add_action(&back_to_game);
         let replay = gio::SimpleAction::new("replay", None);
