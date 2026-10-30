@@ -1,7 +1,7 @@
 //! Physical undo - marker steps restoring a previous position.
 
-mod undo_plan;
-mod undo_step;
+mod plan;
+mod step;
 
-pub use undo_plan::UndoPlan;
-pub use undo_step::UndoStep;
+pub use plan::UndoPlan;
+pub use step::UndoStep;
