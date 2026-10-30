@@ -26,8 +26,5 @@ pub use tangibles_chess_config::CommitMode;
 pub use tangibles_chess_config::GameConfig;
 pub use tangibles_chess_config::OpponentKind;
 pub use tangibles_chess_config::TangibleMode;
-pub use tangibles_chess_geometry::BoardOrientation;
-pub use tangibles_chess_geometry::FieldIndex;
-pub use tangibles_chess_geometry::SceneIndex;
 pub use undo::UndoPlan;
 pub use undo::UndoStep;

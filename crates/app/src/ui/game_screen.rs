@@ -6,8 +6,8 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use smearor_wrot_rotation::RotationWidget;
 use smearor_wrot_rotation::SmearorRotation;
-use tangibles_chess_core::BoardOrientation;
 use tangibles_chess_core::GameConfig;
+use tangibles_chess_geometry::BoardOrientation;
 use tangibles_chess_material::Side;
 
 use crate::l10n::L10n;

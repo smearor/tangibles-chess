@@ -1,6 +1,6 @@
 use shakmaty::Square;
-use tangibles_chess_core::BoardOrientation;
-use tangibles_chess_core::FieldIndex;
+use tangibles_chess_geometry::BoardOrientation;
+use tangibles_chess_geometry::FieldIndex;
 
 use crate::TableEdge;
 
@@ -68,8 +68,8 @@ impl BoardGeometry {
 #[cfg(test)]
 mod tests {
     use shakmaty::Square;
-    use tangibles_chess_core::BoardOrientation;
-    use tangibles_chess_core::FieldIndex;
+    use tangibles_chess_geometry::BoardOrientation;
+    use tangibles_chess_geometry::FieldIndex;
 
     use super::BoardGeometry;
     use crate::TableEdge;

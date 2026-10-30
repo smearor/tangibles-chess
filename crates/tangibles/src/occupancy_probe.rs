@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use tangibles_chess_core::FieldIndex;
+use tangibles_chess_geometry::FieldIndex;
 
 use crate::FieldEvent;
 use crate::FieldEventKind;
@@ -91,7 +91,7 @@ impl OccupancyProbe {
 
 #[cfg(test)]
 mod tests {
-    use tangibles_chess_core::FieldIndex;
+    use tangibles_chess_geometry::FieldIndex;
 
     use super::OccupancyProbe;
     use crate::FieldEvent;

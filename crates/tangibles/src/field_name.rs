@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 use std::str::FromStr;
-use tangibles_chess_core::FieldIndex;
+use tangibles_chess_geometry::FieldIndex;
 
 use crate::Zone;
 
@@ -57,7 +57,7 @@ impl<'de> Deserialize<'de> for FieldName {
 #[cfg(test)]
 mod tests {
     use super::FieldName;
-    use tangibles_chess_core::FieldIndex;
+    use tangibles_chess_geometry::FieldIndex;
 
     use crate::CapSide;
     use crate::Zone;

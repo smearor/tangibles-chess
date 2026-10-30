@@ -5,13 +5,13 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
-use tangibles_chess_core::BoardOrientation;
 use tangibles_chess_core::BoardTheme;
 use tangibles_chess_core::CommitMode;
 use tangibles_chess_core::GameConfig;
 use tangibles_chess_core::OpponentKind;
 use tangibles_chess_core::SavedGame;
 use tangibles_chess_core::TangibleMode;
+use tangibles_chess_geometry::BoardOrientation;
 use tangibles_chess_icons::icon_names;
 
 use crate::l10n::L10n;

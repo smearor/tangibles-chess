@@ -52,7 +52,7 @@ impl PlacementGate {
 mod tests {
     use shakmaty::Chess;
 
-    use tangibles_chess_core::FieldIndex;
+    use tangibles_chess_geometry::FieldIndex;
 
     use super::PlacementGate;
     use crate::BoardGeometry;

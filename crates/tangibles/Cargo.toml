@@ -10,6 +10,7 @@ description = "Tangible input for tangibles-chess: GraphQL client to the tangibl
 
 [dependencies]
 tangibles-chess-core.workspace = true
+tangibles-chess-geometry.workspace = true
 tangibles-chess-material.workspace = true
 shakmaty.workspace = true
 tangible-objects-client.workspace = true
