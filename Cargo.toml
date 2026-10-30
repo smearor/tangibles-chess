@@ -14,7 +14,7 @@ homepage = "https://github.com/smearor/tangibles-chess"
 [workspace.dependencies]
 # workspace crates
 tangibles-chess-config = { path = "crates/config" }
-tangibles-chess-core = { path = "crates/core" }
+tangibles-chess-session = { path = "crates/session" }
 tangibles-chess-engine = { path = "crates/engine" }
 tangibles-chess-geometry = { path = "crates/geometry" }
 tangibles-chess-icons = { path = "crates/icons" }

@@ -1,12 +1,12 @@
 [package]
-name = "tangibles-chess-core"
+name = "tangibles-chess-session"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "Chess game domain logic for tangibles-chess (rules, sessions, undo plans, autosave)"
+description = "Game session for tangibles-chess: lifecycle, position stack, outcome and autosave persistence"
 
 [dependencies]
 tangibles-chess-config.workspace = true

@@ -1,8 +1,8 @@
 //! The `resign` reply shape.
 
 use serde::Serialize;
-use tangibles_chess_core::GameOutcome;
 use tangibles_chess_material::Side;
+use tangibles_chess_session::GameOutcome;
 
 /// Result of a `resign` request.
 #[derive(Debug, Serialize)]

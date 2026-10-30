@@ -15,7 +15,6 @@ use shakmaty::Position;
 use shakmaty::uci::UciMove;
 use std::cell::RefCell;
 use std::net::SocketAddr;
-use tangibles_chess_core::GameOutcome;
 use tangibles_chess_material::Role;
 use tangibles_chess_mcp::CommandError;
 use tangibles_chess_mcp::CommandKind;
@@ -32,6 +31,7 @@ use tangibles_chess_moves::MoveOutcome;
 use tangibles_chess_moves::MoveRequest;
 use tangibles_chess_notation::SquareName;
 use tangibles_chess_notation::Uci;
+use tangibles_chess_session::GameOutcome;
 use tracing::info;
 
 use super::game_controller::GameController;

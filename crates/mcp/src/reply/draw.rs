@@ -1,7 +1,7 @@
 //! The `agree_draw` reply shape.
 
 use serde::Serialize;
-use tangibles_chess_core::GameOutcome;
+use tangibles_chess_session::GameOutcome;
 
 /// Result of an `agree_draw` request.
 #[derive(Debug, Serialize)]

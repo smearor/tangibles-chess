@@ -6,8 +6,8 @@ use std::time::Duration;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 use tangibles_chess_config::GameConfig;
-use tangibles_chess_core::GameSession;
-use tangibles_chess_core::SavedGame;
+use tangibles_chess_session::GameSession;
+use tangibles_chess_session::SavedGame;
 use tangibles_chess_tangibles::MockSource;
 use tracing::info;
 

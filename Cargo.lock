@@ -2870,7 +2870,6 @@ dependencies = [
  "signal-hook",
  "smearor-wrot-rotation",
  "tangibles-chess-config",
- "tangibles-chess-core",
  "tangibles-chess-engine",
  "tangibles-chess-geometry",
  "tangibles-chess-icons",
@@ -2878,6 +2877,7 @@ dependencies = [
  "tangibles-chess-mcp",
  "tangibles-chess-moves",
  "tangibles-chess-notation",
+ "tangibles-chess-session",
  "tangibles-chess-tangibles",
  "thiserror 2.0.21",
  "tokio",
@@ -2893,22 +2893,6 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "tangibles-chess-geometry",
-]
-
-[[package]]
-name = "tangibles-chess-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "shakmaty",
- "tangibles-chess-config",
- "tangibles-chess-material",
- "tangibles-chess-moves",
- "tangibles-chess-notation",
- "tangibles-chess-undo",
- "thiserror 2.0.21",
- "toml 0.9.12+spec-1.1.0",
- "tracing",
 ]
 
 [[package]]
@@ -2964,10 +2948,10 @@ dependencies = [
  "serde_json",
  "shakmaty",
  "tangibles-chess-config",
- "tangibles-chess-core",
  "tangibles-chess-material",
  "tangibles-chess-moves",
  "tangibles-chess-notation",
+ "tangibles-chess-session",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -2989,6 +2973,22 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "shakmaty",
+]
+
+[[package]]
+name = "tangibles-chess-session"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "shakmaty",
+ "tangibles-chess-config",
+ "tangibles-chess-material",
+ "tangibles-chess-moves",
+ "tangibles-chess-notation",
+ "tangibles-chess-undo",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
 ]
 
 [[package]]

@@ -10,9 +10,9 @@ use tangibles_chess_config::CommitMode;
 use tangibles_chess_config::GameConfig;
 use tangibles_chess_config::OpponentKind;
 use tangibles_chess_config::TangibleMode;
-use tangibles_chess_core::SavedGame;
 use tangibles_chess_geometry::BoardOrientation;
 use tangibles_chess_icons::icon_names;
+use tangibles_chess_session::SavedGame;
 
 use crate::l10n::L10n;
 use crate::ui::dual_facing_row::DualFacingRow;
