@@ -6,8 +6,8 @@ use rmcp::model::CallToolResult;
 use rmcp::model::ContentBlock;
 use rmcp::tool;
 use rmcp::tool_router;
-use tangibles_chess_core::Side;
-use tangibles_chess_core::Uci;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::Uci;
 
 use super::chess_mcp::ChessMcp;
 use super::legal_moves_args::LegalMovesArgs;

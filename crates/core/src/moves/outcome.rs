@@ -1,7 +1,7 @@
 use shakmaty::Square;
+use tangibles_chess_notation::San;
 
 use crate::IllegalReason;
-use crate::San;
 
 /// Result of validating a [`crate::MoveRequest`] against the position.
 #[derive(Debug, Clone, PartialEq, Eq)]

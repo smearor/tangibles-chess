@@ -1,8 +1,8 @@
 //! The command protocol between the MCP thread and the GTK main loop.
 
 use shakmaty::Square;
-use tangibles_chess_core::Side;
-use tangibles_chess_core::Uci;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::Uci;
 
 /// One command a tool can dispatch to the game controller.
 ///

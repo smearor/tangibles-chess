@@ -1,8 +1,8 @@
 //! The `legal_moves` reply shape.
 
 use serde::Serialize;
-use tangibles_chess_core::Side;
-use tangibles_chess_core::Uci;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::Uci;
 
 /// Legal-move list (`legal_moves` tool).
 #[derive(Debug, Serialize)]

@@ -1,6 +1,7 @@
 //! `Position::play` rejecting a candidate move.
 
 use shakmaty::Move;
+use tangibles_chess_notation::Uci;
 
 /// `Position::play` rejected a validated candidate move - the
 /// domain-side mirror of `shakmaty::PlayError`, keeping the rejected
@@ -14,7 +15,7 @@ pub struct PlayRejection {
 impl std::fmt::Display for PlayRejection {
     /// `"engine rejected e1g1"` - the rejected move in UCI notation.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "engine rejected {}", crate::Uci::from_move(&self.mv))
+        write!(f, "engine rejected {}", Uci::from_move(&self.mv))
     }
 }
 

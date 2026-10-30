@@ -1,9 +1,9 @@
 //! The `make_move` reply shape.
 
 use serde::Serialize;
-use tangibles_chess_core::Fen;
-use tangibles_chess_core::San;
-use tangibles_chess_core::SquareName;
+use tangibles_chess_notation::Fen;
+use tangibles_chess_notation::San;
+use tangibles_chess_notation::SquareName;
 
 /// Result of a `make_move` request.
 #[derive(Debug, Serialize)]

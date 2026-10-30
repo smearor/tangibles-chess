@@ -11,7 +11,7 @@ use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_core::BoardTheme;
-use tangibles_chess_core::Piece;
+use tangibles_chess_material::Piece;
 
 use crate::theme::TextureLayout;
 use crate::theme::ThemePalette;
@@ -336,7 +336,7 @@ mod imp {
                     };
                     snapshot.save();
                     snapshot.translate(&graphene::Point::new(x as f32, y as f32));
-                    if piece.side == tangibles_chess_core::Side::Black {
+                    if piece.side == tangibles_chess_material::Side::Black {
                         // The north player faces their own pieces: flip
                         // black glyphs around the cell centre so they are
                         // readable upside down.

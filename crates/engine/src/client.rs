@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use shakmaty::Chess;
 use shakmaty::Move;
-use tangibles_chess_core::Fen;
+use tangibles_chess_notation::Fen;
 
 use crate::EngineError;
 use crate::command::EngineCommand;

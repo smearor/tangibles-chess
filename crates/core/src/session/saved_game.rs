@@ -3,13 +3,13 @@ use serde::Serialize;
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::uci::UciMove;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::San;
+use tangibles_chess_notation::Uci;
 
 use crate::GameConfig;
 use crate::GameError;
 use crate::Ply;
-use crate::San;
-use crate::Side;
-use crate::Uci;
 
 /// Persistent snapshot of a game for autosave/resume.
 ///
@@ -78,8 +78,8 @@ impl SavedGame {
 mod tests {
     use super::SavedGame;
     use crate::GameConfig;
-    use crate::San;
-    use crate::Uci;
+    use tangibles_chess_notation::San;
+    use tangibles_chess_notation::Uci;
 
     #[test]
     fn toml_roundtrip() {

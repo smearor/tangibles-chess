@@ -1,6 +1,5 @@
 use shakmaty::Square;
-
-use crate::Piece;
+use tangibles_chess_material::Piece;
 
 /// One physical step of an [`crate::UndoPlan`].
 ///

@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use gtk4::prelude::*;
 use tangibles_chess_core::Ply;
-use tangibles_chess_core::San;
-use tangibles_chess_core::Side;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::San;
 use tracing::debug;
 
 /// Paper-scoresheet styled move list along a board edge.

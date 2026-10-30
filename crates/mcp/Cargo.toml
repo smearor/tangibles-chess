@@ -10,6 +10,8 @@ description = "MCP server for tangibles-chess: game-state introspection and move
 
 [dependencies]
 tangibles-chess-core.workspace = true
+tangibles-chess-material.workspace = true
+tangibles-chess-notation.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true

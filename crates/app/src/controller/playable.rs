@@ -5,10 +5,10 @@ use shakmaty::Square;
 use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::MoveOutcome;
 use tangibles_chess_core::MoveRequest;
-use tangibles_chess_core::Piece;
-use tangibles_chess_core::Role;
-use tangibles_chess_core::Side;
 use tangibles_chess_core::TangibleMode;
+use tangibles_chess_material::Piece;
+use tangibles_chess_material::Role;
+use tangibles_chess_material::Side;
 use tracing::debug;
 use tracing::warn;
 

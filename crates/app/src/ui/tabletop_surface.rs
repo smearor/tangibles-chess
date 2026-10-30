@@ -2,7 +2,7 @@ use gtk4::prelude::*;
 use smearor_wrot_rotation::RotationWidget;
 use smearor_wrot_rotation::SmearorRotation;
 use tangibles_chess_core::GameConfig;
-use tangibles_chess_core::Side;
+use tangibles_chess_material::Side;
 
 use crate::ui::chess_scene::ChessScene;
 use crate::ui::player_panel::PanelActions;

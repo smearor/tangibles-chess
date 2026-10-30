@@ -5,24 +5,24 @@ use shakmaty::Move;
 use shakmaty::Position;
 use shakmaty::Square;
 use shakmaty::zobrist::Zobrist64;
+use tangibles_chess_material::Piece;
+use tangibles_chess_material::Role;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::Fen;
+use tangibles_chess_notation::San;
+use tangibles_chess_notation::Uci;
 
 use crate::CheckProjection;
 use crate::DrawReason;
-use crate::Fen;
 use crate::GameConfig;
 use crate::GameError;
 use crate::GamePhase;
 use crate::IllegalReason;
 use crate::MoveOutcome;
 use crate::MoveRequest;
-use crate::Piece;
 use crate::PlayRejection;
 use crate::Ply;
-use crate::Role;
-use crate::San;
 use crate::SavedGame;
-use crate::Side;
-use crate::Uci;
 use crate::UndoPlan;
 
 /// A running or configured chess game.
@@ -415,10 +415,10 @@ mod tests {
     use crate::MoveOutcome;
     use crate::MoveRequest;
     use crate::Ply;
-    use crate::Role;
-    use crate::San;
-    use crate::Side;
     use crate::TangibleMode;
+    use tangibles_chess_material::Role;
+    use tangibles_chess_material::Side;
+    use tangibles_chess_notation::San;
 
     fn session() -> GameSession {
         let mut session = GameSession::new(GameConfig::default());

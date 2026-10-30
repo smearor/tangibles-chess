@@ -1,7 +1,7 @@
-use crate::Role;
 use shakmaty::File;
 use shakmaty::Move;
 use shakmaty::Square;
+use tangibles_chess_material::Role;
 
 /// A requested move between two squares, as produced by touch input or
 /// the tangible move inference.

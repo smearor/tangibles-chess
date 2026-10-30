@@ -5,9 +5,9 @@ use gtk4::prelude::*;
 use smearor_wrot_rotation::RotationWidget;
 use smearor_wrot_rotation::SmearorRotation;
 use std::rc::Rc;
-use tangibles_chess_core::Piece;
-use tangibles_chess_core::Role;
-use tangibles_chess_core::Side;
+use tangibles_chess_material::Piece;
+use tangibles_chess_material::Role;
+use tangibles_chess_material::Side;
 
 /// Promotion role chooser shown when a pawn reaches the last rank.
 ///

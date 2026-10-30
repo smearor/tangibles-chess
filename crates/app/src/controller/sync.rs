@@ -9,10 +9,10 @@ use tangibles_chess_core::DrawReason;
 use tangibles_chess_core::GameConfig;
 use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::MoveRequest;
-use tangibles_chess_core::Piece;
 use tangibles_chess_core::Ply;
-use tangibles_chess_core::Side;
 use tangibles_chess_icons::icon_names;
+use tangibles_chess_material::Piece;
+use tangibles_chess_material::Side;
 use tangibles_chess_tangibles::TableEdge;
 
 use super::game_controller::GameController;

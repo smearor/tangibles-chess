@@ -3,8 +3,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 use shakmaty::KnownOutcome;
-
-use crate::Side;
+use tangibles_chess_material::Side;
 
 /// How a finished game ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

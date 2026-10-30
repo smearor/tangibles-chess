@@ -1,7 +1,7 @@
 //! The `placement_status` reply shape.
 
 use serde::Serialize;
-use tangibles_chess_core::SquareName;
+use tangibles_chess_notation::SquareName;
 
 /// Placement-gate status (`placement_status` tool, tangible modes).
 #[derive(Debug, Serialize)]

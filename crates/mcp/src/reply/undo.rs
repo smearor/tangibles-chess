@@ -1,7 +1,7 @@
 //! The `undo` reply shape.
 
 use serde::Serialize;
-use tangibles_chess_core::Fen;
+use tangibles_chess_notation::Fen;
 
 /// Result of an `undo` request.
 #[derive(Debug, Serialize)]

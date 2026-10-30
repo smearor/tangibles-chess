@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gtk4::prelude::*;
-use tangibles_chess_core::Side;
 use tangibles_chess_icons::icon_names;
+use tangibles_chess_material::Side;
 
 /// Per-player edge panel: name, captured-material tray display and the
 /// action buttons (undo, draw offer, resign).

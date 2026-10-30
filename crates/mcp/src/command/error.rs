@@ -1,7 +1,7 @@
 //! Application-level errors a command can report.
 
 use serde::Serialize;
-use tangibles_chess_core::Uci;
+use tangibles_chess_notation::Uci;
 use thiserror::Error;
 
 /// Why a command failed on the controller side. Serializes as

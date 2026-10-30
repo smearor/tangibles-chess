@@ -1,8 +1,8 @@
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
+use tangibles_chess_material::Piece;
 
-use crate::Piece;
 use crate::UndoStep;
 
 /// Physical steps needed to revert one move on the board.
@@ -88,11 +88,11 @@ mod tests {
     use shakmaty::Square;
     use shakmaty::fen::Fen;
     use shakmaty::uci::UciMove;
+    use tangibles_chess_material::Piece;
+    use tangibles_chess_material::Role;
+    use tangibles_chess_material::Side;
 
     use super::UndoPlan;
-    use crate::Piece;
-    use crate::Role;
-    use crate::Side;
     use crate::UndoStep;
 
     fn play_uci(pos: &Chess, uci: &str) -> Chess {

@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 use tangibles_chess_core::GameOutcome;
-use tangibles_chess_core::Side;
+use tangibles_chess_material::Side;
 
 /// Result of a `resign` request.
 #[derive(Debug, Serialize)]

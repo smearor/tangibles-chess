@@ -2,13 +2,13 @@
 
 use serde::Serialize;
 use tangibles_chess_core::DrawReason;
-use tangibles_chess_core::Fen;
 use tangibles_chess_core::GameOutcome;
 use tangibles_chess_core::GamePhase;
-use tangibles_chess_core::San;
-use tangibles_chess_core::Side;
 use tangibles_chess_core::TangibleMode;
-use tangibles_chess_core::Uci;
+use tangibles_chess_material::Side;
+use tangibles_chess_notation::Fen;
+use tangibles_chess_notation::San;
+use tangibles_chess_notation::Uci;
 
 /// Snapshot of the running game (`game_state` tool).
 #[derive(Debug, Serialize)]

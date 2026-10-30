@@ -1,6 +1,6 @@
 use crate::GamePhase;
 use crate::Ply;
-use crate::Uci;
+use tangibles_chess_notation::Uci;
 use thiserror::Error;
 
 /// Errors of the game domain layer.

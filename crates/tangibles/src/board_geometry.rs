@@ -57,10 +57,10 @@ impl BoardGeometry {
     }
 
     /// The board edge `side` plays from.
-    pub fn side_edge(&self, side: tangibles_chess_core::Side) -> TableEdge {
+    pub fn side_edge(&self, side: tangibles_chess_material::Side) -> TableEdge {
         match side {
-            tangibles_chess_core::Side::White => self.white_edge(),
-            tangibles_chess_core::Side::Black => self.black_edge(),
+            tangibles_chess_material::Side::White => self.white_edge(),
+            tangibles_chess_material::Side::Black => self.black_edge(),
         }
     }
 }

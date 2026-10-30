@@ -2872,7 +2872,9 @@ dependencies = [
  "tangibles-chess-core",
  "tangibles-chess-engine",
  "tangibles-chess-icons",
+ "tangibles-chess-material",
  "tangibles-chess-mcp",
+ "tangibles-chess-notation",
  "tangibles-chess-tangibles",
  "thiserror 2.0.21",
  "tokio",
@@ -2910,7 +2912,7 @@ name = "tangibles-chess-engine"
 version = "0.1.0"
 dependencies = [
  "shakmaty",
- "tangibles-chess-core",
+ "tangibles-chess-notation",
  "thiserror 2.0.21",
  "tracing",
 ]
@@ -2958,6 +2960,8 @@ dependencies = [
  "serde_json",
  "shakmaty",
  "tangibles-chess-core",
+ "tangibles-chess-material",
+ "tangibles-chess-notation",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -2984,6 +2988,7 @@ dependencies = [
  "tangible-objects-client",
  "tangible-objects-model",
  "tangibles-chess-core",
+ "tangibles-chess-material",
  "thiserror 2.0.21",
  "tokio",
  "tracing",

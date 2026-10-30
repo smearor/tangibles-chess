@@ -9,7 +9,7 @@ repository.workspace = true
 description = "UCI subprocess client driving external chess engines (stockfish, gnuchess, ...)"
 
 [dependencies]
-tangibles-chess-core.workspace = true
+tangibles-chess-notation.workspace = true
 shakmaty.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

@@ -1,6 +1,6 @@
 //! A UCI protocol command line sent to the engine.
 
-use tangibles_chess_core::Fen;
+use tangibles_chess_notation::Fen;
 
 /// One command line of the UCI (Universal Chess Interface) protocol.
 /// [`Display`](std::fmt::Display) renders the wire form.
