@@ -9,6 +9,9 @@ repository.workspace = true
 description = "Chess game domain logic for tangibles-chess (rules, sessions, undo plans, autosave)"
 
 [dependencies]
+tangibles-chess-config.workspace = true
+tangibles-chess-geometry.workspace = true
+tangibles-chess-notation.workspace = true
 shakmaty.workspace = true
 serde.workspace = true
 toml.workspace = true

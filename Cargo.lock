@@ -2883,11 +2883,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tangibles-chess-config"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tangibles-chess-geometry",
+]
+
+[[package]]
 name = "tangibles-chess-core"
 version = "0.1.0"
 dependencies = [
  "serde",
  "shakmaty",
+ "tangibles-chess-config",
+ "tangibles-chess-geometry",
+ "tangibles-chess-notation",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
@@ -2901,6 +2912,14 @@ dependencies = [
  "tangibles-chess-core",
  "thiserror 2.0.21",
  "tracing",
+]
+
+[[package]]
+name = "tangibles-chess-geometry"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "shakmaty",
 ]
 
 [[package]]
@@ -2931,6 +2950,14 @@ dependencies = [
  "tangibles-chess-core",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tangibles-chess-notation"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "shakmaty",
 ]
 
 [[package]]

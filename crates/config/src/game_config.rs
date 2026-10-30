@@ -1,11 +1,11 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::BoardOrientation;
 use crate::BoardTheme;
 use crate::CommitMode;
 use crate::OpponentKind;
 use crate::TangibleMode;
+use tangibles_chess_geometry::BoardOrientation;
 
 /// Static configuration chosen on the setup screen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

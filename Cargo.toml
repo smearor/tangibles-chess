@@ -13,11 +13,14 @@ homepage = "https://github.com/smearor/tangibles-chess"
 
 [workspace.dependencies]
 # workspace crates
+tangibles-chess-config = { path = "crates/config" }
 tangibles-chess-core = { path = "crates/core" }
-tangibles-chess-tangibles = { path = "crates/tangibles" }
 tangibles-chess-engine = { path = "crates/engine" }
+tangibles-chess-geometry = { path = "crates/geometry" }
 tangibles-chess-icons = { path = "crates/icons" }
 tangibles-chess-mcp = { path = "crates/mcp" }
+tangibles-chess-notation = { path = "crates/notation" }
+tangibles-chess-tangibles = { path = "crates/tangibles" }
 # core
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"

@@ -18,6 +18,7 @@ use crate::GamePhase;
 use crate::IllegalReason;
 use crate::MoveOutcome;
 use crate::MoveRequest;
+use crate::Ply;
 use crate::San;
 use crate::SavedGame;
 use crate::Side;
@@ -137,17 +138,17 @@ impl GameSession {
     }
 
     /// Number of plies played.
-    pub fn ply_count(&self) -> usize {
-        self.past.len()
+    pub fn ply_count(&self) -> Ply {
+        Ply::from(self.past.len())
     }
 
-    /// The position after `ply` moves (`0` is the initial position,
-    /// `ply_count()` the current one) - for stepping through the game
-    /// record in replay mode.
-    pub fn position_at(&self, ply: usize) -> Option<&Chess> {
-        if ply < self.past.len() {
-            self.past.get(ply)
-        } else if ply == self.past.len() {
+    /// The position after `ply` moves ([`Ply::START`] is the initial
+    /// position, `ply_count()` the current one) - for stepping through
+    /// the game record in replay mode.
+    pub fn position_at(&self, ply: Ply) -> Option<&Chess> {
+        if ply.index() < self.past.len() {
+            self.past.get(ply.index())
+        } else if ply.index() == self.past.len() {
             Some(&self.position)
         } else {
             None
@@ -413,6 +414,7 @@ mod tests {
     use crate::GamePhase;
     use crate::MoveOutcome;
     use crate::MoveRequest;
+    use crate::Ply;
     use crate::San;
     use crate::Side;
     use crate::TangibleMode;
@@ -568,11 +570,11 @@ mod tests {
         let mut session = session();
         session.request_move(MoveRequest::new(Square::E2, Square::E4));
         session.request_move(MoveRequest::new(Square::E7, Square::E5));
-        assert_eq!(session.ply_count(), 2);
-        assert_eq!(session.position_at(0), Some(&Chess::default()));
-        assert_eq!(session.position_at(2), Some(session.position()));
-        assert!(session.position_at(3).is_none());
-        assert_eq!(session.position_at(1).map(|position| position.turn()), Some(Color::Black));
+        assert_eq!(session.ply_count(), Ply::from(2));
+        assert_eq!(session.position_at(Ply::START), Some(&Chess::default()));
+        assert_eq!(session.position_at(Ply::from(2)), Some(session.position()));
+        assert!(session.position_at(Ply::from(3)).is_none());
+        assert_eq!(session.position_at(Ply::from(1)).map(|position| position.turn()), Some(Color::Black));
     }
 
     #[test]

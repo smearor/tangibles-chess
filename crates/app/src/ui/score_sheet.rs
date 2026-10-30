@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk4::prelude::*;
+use tangibles_chess_core::Ply;
 use tangibles_chess_core::San;
 use tangibles_chess_core::Side;
 use tracing::debug;
@@ -21,7 +22,7 @@ pub struct ScoreSheet {
     sans: RefCell<Vec<San>>,
     /// Highlighted ply index (0-based into the SAN list, replay
     /// cursor).
-    active_ply: Cell<Option<usize>>,
+    active_ply: Cell<Option<Ply>>,
     /// Click callback for a ply (0-based index into the SAN list).
     on_ply: RefCell<Option<PlyHandler>>,
     /// Invalidates scroll callbacks scheduled by older renders.
@@ -29,7 +30,7 @@ pub struct ScoreSheet {
 }
 
 /// Ply click callback receiving a 0-based index into the SAN list.
-type PlyHandler = Rc<dyn Fn(usize)>;
+type PlyHandler = Rc<dyn Fn(Ply)>;
 
 impl ScoreSheet {
     /// A new empty sheet, styled in the player's color like the control
@@ -74,7 +75,7 @@ impl ScoreSheet {
     /// Highlights a ply in the list (0-based index into the SAN list);
     /// `None` clears the highlight. Used by replay mode to mark the
     /// move that produced the displayed position.
-    pub fn set_active_ply(&self, ply: Option<usize>) {
+    pub fn set_active_ply(&self, ply: Option<Ply>) {
         self.active_ply.set(ply);
         self.render();
     }
@@ -94,7 +95,7 @@ impl ScoreSheet {
             number.add_css_class("score-row");
             row.append(&number);
             for (offset, san) in pair.iter().enumerate() {
-                let ply = row_index * 2 + offset;
+                let ply = Ply::from(row_index * 2 + offset);
                 let button = gtk4::Button::new();
                 button.add_css_class("flat");
                 button.add_css_class("score-ply");
@@ -121,7 +122,7 @@ impl ScoreSheet {
         // target position can be computed from the adjustment's upper
         // bound instead of unreliable per-row widget bounds.
         let row_count = self.sans.borrow().len().div_ceil(2);
-        let target = active.map(|ply| ply / 2).or((row_count > 0).then(|| row_count - 1));
+        let target = active.map(|ply| ply.index() / 2).or((row_count > 0).then(|| row_count - 1));
         // A new render supersedes all scroll callbacks still queued from
         // older renders - without this a stale "scroll to tail" could
         // clobber a later "scroll to the selected ply".

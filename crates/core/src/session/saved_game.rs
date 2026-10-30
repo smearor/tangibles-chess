@@ -6,6 +6,7 @@ use shakmaty::uci::UciMove;
 
 use crate::GameConfig;
 use crate::GameError;
+use crate::Ply;
 use crate::San;
 use crate::Side;
 use crate::Uci;
@@ -49,20 +50,21 @@ impl SavedGame {
         let mut position = Chess::default();
         positions.push(position.clone());
         for (index, uci) in self.moves.iter().enumerate() {
+            let move_index = Ply::from(index);
             let mv = UciMove::try_from(uci)
                 .map_err(|e| GameError::CorruptSave {
-                    index,
+                    move_index,
                     uci: uci.clone(),
                     reason: e.to_string(),
                 })?
                 .to_move(&position)
                 .map_err(|e| GameError::CorruptSave {
-                    index,
+                    move_index,
                     uci: uci.clone(),
                     reason: e.to_string(),
                 })?;
             position = position.play(mv).map_err(|e| GameError::CorruptSave {
-                index,
+                move_index,
                 uci: uci.clone(),
                 reason: e.to_string(),
             })?;

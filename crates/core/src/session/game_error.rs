@@ -1,4 +1,5 @@
 use crate::GamePhase;
+use crate::Ply;
 use crate::Uci;
 use thiserror::Error;
 
@@ -12,10 +13,10 @@ pub enum GameError {
     #[error("saved game error: {0}")]
     SavedGame(String),
     /// A stored move failed to replay onto its position.
-    #[error("corrupt saved game: move {index} `{uci}` is not legal: {reason}")]
+    #[error("corrupt saved game: move {move_index} `{uci}` is not legal: {reason}")]
     CorruptSave {
-        /// Index of the offending move in the saved move list.
-        index: usize,
+        /// Ordinal of the offending move in the saved move list.
+        move_index: Ply,
         /// The UCI move string that failed.
         uci: Uci,
         /// Underlying error message.

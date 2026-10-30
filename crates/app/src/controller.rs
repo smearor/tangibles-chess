@@ -26,6 +26,7 @@ use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::GameSession;
 use tangibles_chess_core::MoveOutcome;
 use tangibles_chess_core::MoveRequest;
+use tangibles_chess_core::Ply;
 use tangibles_chess_core::Side;
 use tangibles_chess_core::TangibleMode;
 use tangibles_chess_core::Uci;
@@ -132,7 +133,7 @@ pub struct GameController {
     /// is misplaced; a lift+place back onto `from` is accepted quietly.
     rejected_move: Option<MoveRequest>,
     /// Ply cursor while replaying a finished game (`None` = live).
-    replay_index: Option<usize>,
+    replay_index: Option<Ply>,
     /// The game-over overlay widget, kept for removal when entering
     /// replay mode.
     result_widget: Option<gtk4::Widget>,
@@ -175,7 +176,7 @@ impl GameController {
         let sound = SoundPlayer::new(session.config().sound_enabled);
         // Score-sheet ply clicks jump the replay cursor (finished games
         // only - `replay_goto` guards otherwise).
-        let on_ply = Rc::new(|ply: usize| {
+        let on_ply = Rc::new(|ply: Ply| {
             with_controller(|controller| controller.borrow_mut().replay_goto(ply));
         });
         screen.surface.white_sheet.set_on_ply(on_ply.clone());
@@ -1059,7 +1060,7 @@ impl GameController {
     /// overlay and lets the undo/redo buttons step through the recorded
     /// plies without mutating the session.
     pub fn enter_replay(&mut self) {
-        if self.session.phase() != GamePhase::Finished || self.session.ply_count() == 0 {
+        if self.session.phase() != GamePhase::Finished || self.session.ply_count().is_start() {
             return;
         }
         if let Some(widget) = self.result_widget.take() {
@@ -1070,16 +1071,16 @@ impl GameController {
     }
 
     /// Jumps the replay cursor straight to the position after
-    /// `move_index`'s move (score-sheet click, 0-based ply index).
+    /// `move_index`'s move (score-sheet click, 0-based ply ordinal).
     /// Enters replay mode implicitly on a finished game.
-    pub fn replay_goto(&mut self, move_index: usize) {
+    pub fn replay_goto(&mut self, move_index: Ply) {
         if self.session.phase() != GamePhase::Finished {
             return;
         }
         if let Some(widget) = self.result_widget.take() {
             self.screen.pop_overlay(&widget);
         }
-        self.replay_index = Some((move_index + 1).min(self.session.ply_count()));
+        self.replay_index = Some(move_index.next().min(self.session.ply_count()));
         self.sync_scene();
     }
 
@@ -1088,7 +1089,7 @@ impl GameController {
         let Some(index) = self.replay_index else {
             return;
         };
-        let next = index.saturating_add_signed(delta as isize).min(self.session.ply_count());
+        let next = index.step(delta).min(self.session.ply_count());
         self.replay_index = Some(next);
         self.sync_scene();
     }
@@ -1207,7 +1208,7 @@ impl GameController {
         self.screen.surface.black_sheet.set_moves(sans);
         // In replay mode the cursor's producing move is highlighted:
         // position after ply `n` comes from move `n - 1`.
-        let active_ply = self.replay_index.and_then(|index| index.checked_sub(1));
+        let active_ply = self.replay_index.and_then(Ply::prev);
         self.screen.surface.white_sheet.set_active_ply(active_ply);
         self.screen.surface.black_sheet.set_active_ply(active_ply);
         let (turn_text, active) = match position.turn() {
@@ -1233,7 +1234,7 @@ impl GameController {
         let (can_undo, can_redo) = match self.replay_index {
             // In replay the buttons walk the cursor instead of the undo
             // stack.
-            Some(index) => (index > 0, index < self.session.ply_count()),
+            Some(index) => (!index.is_start(), index < self.session.ply_count()),
             None => (self.session.can_undo(), self.session.can_redo()),
         };
         self.screen.surface.white_panel.set_undo_enabled(can_undo);
