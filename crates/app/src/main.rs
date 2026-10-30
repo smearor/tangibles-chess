@@ -1,10 +1,14 @@
 mod controller;
 mod l10n;
+mod replayable;
+mod rotatable;
 mod settings;
 mod sound;
+mod sound_effect;
 mod tangible_host;
 mod theme;
 mod ui;
+mod undoable;
 
 use std::rc::Rc;
 

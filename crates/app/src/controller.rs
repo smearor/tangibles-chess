@@ -56,8 +56,11 @@ use tracing::info;
 use tracing::warn;
 
 use crate::l10n::L10n;
+use crate::replayable::Replayable;
+use crate::rotatable::Rotatable;
 use crate::settings::AppSettings;
 use crate::sound::SoundPlayer;
+use crate::sound_effect::SoundEffect;
 use crate::tangible_host::TangibleHost;
 use crate::ui::chess_scene::FlashRole;
 use crate::ui::chess_scene::IllegalFlash;
@@ -65,6 +68,7 @@ use crate::ui::game_result::GameResult;
 use crate::ui::game_screen::GameScreen;
 use crate::ui::parking_strip::ParkingStrip;
 use crate::ui::promotion_picker::PromotionPicker;
+use crate::undoable::Undoable;
 use tangibles_chess_mcp::DrawReply;
 use tangibles_chess_mcp::ErrorReply;
 use tangibles_chess_mcp::GameStateReply;
@@ -915,11 +919,11 @@ impl GameController {
                 self.selected = None;
                 self.last_move = Some((request.from, request.to));
                 if self.session.position().is_check() {
-                    self.sound.play("check");
+                    self.sound.play(SoundEffect::Check);
                 } else if san.as_str().contains('x') {
-                    self.sound.play("capture");
+                    self.sound.play(SoundEffect::Capture);
                 } else {
-                    self.sound.play("move");
+                    self.sound.play(SoundEffect::Move);
                 }
                 if let Some(victim) = victim.filter(|_| san.as_str().contains('x')) {
                     self.screen.show_message(&self.capture_notice(mover, victim, request.to));
@@ -927,12 +931,12 @@ impl GameController {
                 self.sync_scene();
                 self.autosave();
                 if self.session.phase() == GamePhase::Finished {
-                    self.sound.play("end");
+                    self.sound.play(SoundEffect::End);
                 }
             }
-            MoveOutcome::NeedsPromotion { to } => {
+            MoveOutcome::NeedsPromotion { .. } => {
                 self.pending_promotion = Some(request);
-                self.show_promotion_picker(*to);
+                self.show_promotion_picker();
             }
             MoveOutcome::Illegal(reason) => {
                 warn!("illegal move rejected: {reason}");
@@ -981,12 +985,9 @@ impl GameController {
     }
 
     /// Shows the promotion picker facing the moving player.
-    fn show_promotion_picker(&self, _to: Square) {
+    fn show_promotion_picker(&self) {
         let mover = self.session.turn();
-        let facing_north = match mover {
-            Side::White => self.geometry.white_edge() == TableEdge::North,
-            Side::Black => self.geometry.black_edge() == TableEdge::North,
-        };
+        let facing_north = self.geometry.side_edge(mover) == TableEdge::North;
         let picker = PromotionPicker::new(
             mover,
             facing_north,
@@ -1012,88 +1013,6 @@ impl GameController {
         *self.promotion_widget.borrow_mut() = Some(picker.widget.clone());
     }
 
-    /// Undo: logical revert + (M2) physical guide. In replay mode the
-    /// button steps the cursor back instead.
-    pub fn undo(&mut self) {
-        if self.replay_index.is_some() {
-            self.replay_step(-1);
-            return;
-        }
-        if let Some(plan) = self.session.undo() {
-            for step in &plan.steps {
-                debug!("undo step: {step:?}");
-            }
-            self.last_move = None;
-            self.sync_scene();
-            self.autosave();
-        }
-    }
-
-    /// Redo: re-applies a move undone by `undo`. In replay mode the
-    /// button steps the cursor forward instead.
-    pub fn redo(&mut self) {
-        if self.replay_index.is_some() {
-            self.replay_step(1);
-            return;
-        }
-        if let Some(plan) = self.session.redo() {
-            for step in &plan.steps {
-                debug!("redo step: {step:?}");
-            }
-            self.last_move = None;
-            self.sync_scene();
-            self.autosave();
-        }
-    }
-
-    /// Enters replay mode on a finished game: dismisses the result
-    /// overlay and lets the undo/redo buttons step through the recorded
-    /// plies without mutating the session.
-    pub fn enter_replay(&mut self) {
-        if self.session.phase() != GamePhase::Finished || self.session.ply_count().is_start() {
-            return;
-        }
-        if let Some(widget) = self.result_widget.take() {
-            self.screen.pop_overlay(&widget);
-        }
-        self.replay_index = Some(self.session.ply_count());
-        self.sync_scene();
-    }
-
-    /// Jumps the replay cursor straight to the position after
-    /// `move_index`'s move (score-sheet click, 0-based ply ordinal).
-    /// Enters replay mode implicitly on a finished game.
-    pub fn replay_goto(&mut self, move_index: Ply) {
-        if self.session.phase() != GamePhase::Finished {
-            return;
-        }
-        if let Some(widget) = self.result_widget.take() {
-            self.screen.pop_overlay(&widget);
-        }
-        self.replay_index = Some(move_index.next().min(self.session.ply_count()));
-        self.sync_scene();
-    }
-
-    /// Moves the replay cursor by `delta` plies (clamped).
-    fn replay_step(&mut self, delta: i64) {
-        let Some(index) = self.replay_index else {
-            return;
-        };
-        let next = index.step(delta).min(self.session.ply_count());
-        self.replay_index = Some(next);
-        self.sync_scene();
-    }
-
-    /// Leaves replay mode and returns to the result overlay.
-    pub fn exit_replay(&mut self) {
-        if self.replay_index.is_none() {
-            return;
-        }
-        self.replay_index = None;
-        self.result_shown = false;
-        self.sync_scene();
-    }
-
     /// Applies the setup options that are safe to change mid-game
     /// (board theme, sound, undo) to the running session. Structural
     /// options (input mode, commit mode, handshake, orientation,
@@ -1112,35 +1031,6 @@ impl GameController {
         self.screen.surface.scene.update(|state| state.theme = config.theme);
         self.sync_scene();
         self.autosave();
-    }
-
-    /// Rotates the board one quarter turn clockwise.
-    pub fn rotate_cw(&mut self) {
-        self.rotate(true);
-    }
-
-    /// Rotates the board one quarter turn counter-clockwise.
-    pub fn rotate_ccw(&mut self) {
-        self.rotate(false);
-    }
-
-    /// Applies a rotation step, updating the field mapping. Locked while
-    /// a tangible game is in progress (resting markers would remap).
-    fn rotate(&mut self, clockwise: bool) {
-        let locked = self.session.config().tangible_mode.uses_tangibles() && self.session.phase() == GamePhase::InProgress;
-        if locked {
-            self.screen.show_message(&self.l10n.msg("game-rotation-locked"));
-            return;
-        }
-        self.screen.rotate_step(clockwise);
-        // The physical field mapping follows the rotated board - re-register
-        // once the rotation animation has settled.
-        glib::timeout_add_local_once(std::time::Duration::from_millis(600), || {
-            with_controller(|controller| Self::register_when_ready(controller.clone()));
-        });
-        self.geometry = BoardGeometry::new(self.screen.orientation(), self.geometry.white_edge());
-        self.inference = MoveInference::new(self.geometry, self.session.config().commit_mode);
-        self.gate = PlacementGate::new(self.geometry);
     }
 
     /// Resign for `side`.
@@ -1290,6 +1180,110 @@ impl GameController {
         let _ = std::fs::create_dir_all(&dir);
         if let Ok(text) = self.session.to_saved().to_toml() {
             let _ = std::fs::write(dir.join("autosave.toml"), text);
+        }
+    }
+}
+
+impl Replayable for GameController {
+    /// Enters replay mode on a finished game: dismisses the result
+    /// overlay and lets the undo/redo buttons step through the recorded
+    /// plies without mutating the session.
+    fn enter_replay(&mut self) {
+        if self.session.phase() != GamePhase::Finished || self.session.ply_count().is_start() {
+            return;
+        }
+        if let Some(widget) = self.result_widget.take() {
+            self.screen.pop_overlay(&widget);
+        }
+        self.replay_index = Some(self.session.ply_count());
+        self.sync_scene();
+    }
+
+    /// Jumps the replay cursor straight to the position after
+    /// `move_index`'s move (score-sheet click, 0-based ply ordinal).
+    /// Enters replay mode implicitly on a finished game.
+    fn replay_goto(&mut self, move_index: Ply) {
+        if self.session.phase() != GamePhase::Finished {
+            return;
+        }
+        if let Some(widget) = self.result_widget.take() {
+            self.screen.pop_overlay(&widget);
+        }
+        self.replay_index = Some(move_index.next().min(self.session.ply_count()));
+        self.sync_scene();
+    }
+
+    fn replay_step(&mut self, delta: i64) {
+        let Some(index) = self.replay_index else {
+            return;
+        };
+        let next = index.step(delta).min(self.session.ply_count());
+        self.replay_index = Some(next);
+        self.sync_scene();
+    }
+
+    /// Leaves replay mode and returns to the result overlay.
+    fn exit_replay(&mut self) {
+        if self.replay_index.is_none() {
+            return;
+        }
+        self.replay_index = None;
+        self.result_shown = false;
+        self.sync_scene();
+    }
+}
+
+impl Rotatable for GameController {
+    /// Applies a rotation step, updating the field mapping. Locked while
+    /// a tangible game is in progress (resting markers would remap).
+    fn rotate(&mut self, clockwise: bool) {
+        let locked = self.session.config().tangible_mode.uses_tangibles() && self.session.phase() == GamePhase::InProgress;
+        if locked {
+            self.screen.show_message(&self.l10n.msg("game-rotation-locked"));
+            return;
+        }
+        self.screen.rotate_step(clockwise);
+        // The physical field mapping follows the rotated board - re-register
+        // once the rotation animation has settled.
+        glib::timeout_add_local_once(std::time::Duration::from_millis(600), || {
+            with_controller(|controller| Self::register_when_ready(controller.clone()));
+        });
+        self.geometry = BoardGeometry::new(self.screen.orientation(), self.geometry.white_edge());
+        self.inference = MoveInference::new(self.geometry, self.session.config().commit_mode);
+        self.gate = PlacementGate::new(self.geometry);
+    }
+}
+
+impl Undoable for GameController {
+    /// Steps the replay cursor back, or reverts the last half-move.
+    fn undo(&mut self) {
+        if self.replay_index.is_some() {
+            self.replay_step(-1);
+            return;
+        }
+        if let Some(plan) = self.session.undo() {
+            for step in &plan.steps {
+                debug!("undo step: {step:?}");
+            }
+            self.last_move = None;
+            self.sync_scene();
+            self.autosave();
+        }
+    }
+
+    /// Steps the replay cursor forward, or re-applies an undone move.
+    fn redo(&mut self) {
+        if self.replay_index.is_some() {
+            self.replay_step(1);
+            return;
+        }
+        if let Some(plan) = self.session.redo() {
+            for step in &plan.steps {
+                debug!("redo step: {step:?}");
+            }
+            self.last_move = None;
+            self.sync_scene();
+            self.autosave();
         }
     }
 }

@@ -113,8 +113,8 @@ pub(crate) enum FlashRole {
 /// bottom-right); the `RotationWidget` handles the physical orientation.
 /// All input arrives already un-rotated in scene coordinates.
 mod imp {
-    use gtk4::{IconLookupFlags, TextDirection};
     use super::*;
+    use gtk4::{IconLookupFlags, TextDirection};
 
     /// Implementation state of [`ChessScene`].
     #[derive(Default)]

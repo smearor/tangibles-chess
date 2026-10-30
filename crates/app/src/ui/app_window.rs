@@ -15,11 +15,14 @@ use crate::controller::GameController;
 use crate::controller::set_active_controller;
 use crate::controller::with_controller;
 use crate::l10n::L10n;
+use crate::replayable::Replayable;
+use crate::rotatable::Rotatable;
 use crate::settings::AppSettings;
 use crate::tangible_host::TangibleHost;
 use crate::ui::game_screen::GameScreen;
 use crate::ui::player_panel::PanelActions;
 use crate::ui::setup_screen::SetupScreen;
+use crate::undoable::Undoable;
 
 /// The application window: a stack switching between setup and the game.
 pub struct AppWindow {

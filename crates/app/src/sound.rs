@@ -1,6 +1,11 @@
 use std::cell::Cell;
 
+use gtk4::MediaFile;
+use gtk4::gio::ResourceLookupFlags;
+use gtk4::gio::resources_lookup_data;
 use gtk4::prelude::*;
+
+use crate::sound_effect::SoundEffect;
 
 /// Game sound effects via `gtk::MediaFile` on gresource-embedded audio.
 ///
@@ -22,16 +27,16 @@ impl SoundPlayer {
         self.enabled.set(enabled);
     }
 
-    /// Plays a named sound resource if present.
-    pub fn play(&self, name: &str) {
+    /// Plays a sound effect's resource if present.
+    pub fn play(&self, effect: SoundEffect) {
         if !self.enabled.get() {
             return;
         }
-        let path = format!("/io/github/smearor/tangibles_chess/sounds/{name}.ogg");
-        if gtk4::gio::resources_lookup_data(&path, gtk4::gio::ResourceLookupFlags::NONE).is_err() {
+        let path = format!("/io/github/smearor/tangibles_chess/sounds/{effect}.ogg");
+        if resources_lookup_data(&path, ResourceLookupFlags::NONE).is_err() {
             return;
         }
-        let file = gtk4::MediaFile::for_resource(&path);
+        let file = MediaFile::for_resource(&path);
         file.play();
     }
 }
