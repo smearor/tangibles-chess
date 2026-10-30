@@ -16,6 +16,7 @@ use crate::IllegalReason;
 use crate::MoveOutcome;
 use crate::MoveRequest;
 use crate::Piece;
+use crate::PlayRejection;
 use crate::Ply;
 use crate::Role;
 use crate::San;
@@ -220,7 +221,7 @@ impl GameSession {
                 self.finish_if_terminal();
                 MoveOutcome::Applied(san)
             }
-            Err(err) => MoveOutcome::Illegal(IllegalReason::PlayRejected(err.to_string())),
+            Err(err) => MoveOutcome::Illegal(IllegalReason::PlayRejected(PlayRejection::from(err))),
         }
     }
 

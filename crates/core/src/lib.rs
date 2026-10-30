@@ -17,6 +17,7 @@ pub use moves::CheckProjection;
 pub use moves::IllegalReason;
 pub use moves::MoveOutcome;
 pub use moves::MoveRequest;
+pub use moves::PlayRejection;
 pub use moves::Ply;
 pub use session::DrawReason;
 pub use session::GameError;

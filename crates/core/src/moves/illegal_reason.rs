@@ -2,6 +2,7 @@
 
 use crate::GamePhase;
 use crate::MoveRequest;
+use crate::PlayRejection;
 
 /// The reason a [`crate::MoveRequest`] did not apply.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,8 +13,8 @@ pub enum IllegalReason {
     NotLegal(MoveRequest),
     /// The requested promotion role matches no candidate move.
     BadPromotion,
-    /// shakmaty rejected the play call after validation (raw error).
-    PlayRejected(String),
+    /// The engine rejected the play call after validation.
+    PlayRejected(PlayRejection),
 }
 
 impl IllegalReason {
@@ -34,7 +35,7 @@ impl std::fmt::Display for IllegalReason {
             Self::WrongPhase(phase) => write!(f, "game is in phase {phase:?}"),
             Self::NotLegal(request) => write!(f, "{}-{} is not a legal move", request.from, request.to),
             Self::BadPromotion => f.write_str("no matching move for the given promotion"),
-            Self::PlayRejected(err) => f.write_str(err),
+            Self::PlayRejected(err) => write!(f, "{err}"),
         }
     }
 }
