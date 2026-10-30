@@ -7,7 +7,6 @@
 
 mod moves;
 mod session;
-mod undo;
 
 pub use moves::CheckProjection;
 pub use moves::IllegalReason;
@@ -21,5 +20,3 @@ pub use session::GameOutcome;
 pub use session::GamePhase;
 pub use session::GameSession;
 pub use session::SavedGame;
-pub use undo::UndoPlan;
-pub use undo::UndoStep;

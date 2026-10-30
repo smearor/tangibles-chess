@@ -1,0 +1,13 @@
+[package]
+name = "tangibles-chess-undo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Physical undo for tangibles-chess: marker steps restoring a previous position"
+
+[dependencies]
+shakmaty.workspace = true
+tangibles-chess-material.workspace = true

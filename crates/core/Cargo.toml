@@ -12,6 +12,7 @@ description = "Chess game domain logic for tangibles-chess (rules, sessions, und
 tangibles-chess-config.workspace = true
 tangibles-chess-material.workspace = true
 tangibles-chess-notation.workspace = true
+tangibles-chess-undo.workspace = true
 shakmaty.workspace = true
 serde.workspace = true
 toml.workspace = true

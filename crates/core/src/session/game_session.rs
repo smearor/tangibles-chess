@@ -12,6 +12,7 @@ use tangibles_chess_material::Side;
 use tangibles_chess_notation::Fen;
 use tangibles_chess_notation::San;
 use tangibles_chess_notation::Uci;
+use tangibles_chess_undo::UndoPlan;
 
 use crate::CheckProjection;
 use crate::DrawReason;
@@ -23,7 +24,6 @@ use crate::MoveRequest;
 use crate::PlayRejection;
 use crate::Ply;
 use crate::SavedGame;
-use crate::UndoPlan;
 
 /// A running or configured chess game.
 ///
