@@ -35,8 +35,8 @@ impl EngineClient {
     /// Spawns `path` and performs the `uci` + `isready` handshake.
     pub fn spawn(path: &str) -> Result<Self, EngineError> {
         let mut child = Command::new(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
-        let stdin = child.stdin.take().ok_or(EngineError::Protocol("no stdin".to_string()))?;
-        let stdout = child.stdout.take().ok_or(EngineError::Protocol("no stdout".to_string()))?;
+        let stdin = child.stdin.take().ok_or(EngineError::MissingStdin)?;
+        let stdout = child.stdout.take().ok_or(EngineError::MissingStdout)?;
         let (tx, lines) = mpsc::channel();
         std::thread::spawn(move || {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -67,12 +67,9 @@ impl EngineClient {
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return Err(EngineError::Protocol(format!("timeout waiting for `{}`", expected.keyword())));
+                return Err(EngineError::Timeout(expected.keyword()));
             }
-            let line = self
-                .lines
-                .recv_timeout(remaining)
-                .map_err(|_| EngineError::Protocol(format!("timeout waiting for `{}`", expected.keyword())))?;
+            let line = self.lines.recv_timeout(remaining).map_err(|_| EngineError::Timeout(expected.keyword()))?;
             let response = EngineResponse::parse(&line);
             if response.keyword() == expected.keyword() {
                 return Ok(response);
@@ -95,20 +92,18 @@ impl EngineClient {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 self.send(&EngineCommand::Stop)?;
-                return Err(EngineError::Protocol("no bestmove in time".to_string()));
+                return Err(EngineError::NoBestMove);
             }
             let Ok(line) = self.lines.recv_timeout(remaining) else {
                 self.send(&EngineCommand::Stop)?;
-                return Err(EngineError::Protocol("no bestmove in time".to_string()));
+                return Err(EngineError::NoBestMove);
             };
             match EngineResponse::parse(&line) {
                 EngineResponse::BestMove(mv) => {
-                    return mv
-                        .map(|uci| uci.to_move(position).map_err(|_| EngineError::Protocol("bestmove not legal".to_string())))
-                        .transpose();
+                    return mv.map(|uci| uci.to_move(position).map_err(|_| EngineError::BestMoveNotLegal)).transpose();
                 }
                 EngineResponse::InvalidBestMove(token) => {
-                    return Err(EngineError::Protocol(format!("illegal bestmove `{token}`")));
+                    return Err(EngineError::IllegalBestMove(token));
                 }
                 _ => {}
             }
