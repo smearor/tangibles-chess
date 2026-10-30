@@ -1,22 +1,22 @@
 //! MCP reply payloads - one `Serialize` type per tool response.
 
-mod draw_reply;
-mod game_state_reply;
-mod legal_moves_reply;
-mod make_move_reply;
-mod placement_reply;
-mod resign_reply;
-mod screenshot_reply;
-mod undo_reply;
+mod draw;
+mod game_state;
+mod legal_moves;
+mod make_move;
+mod placement;
+mod resign;
+mod screenshot;
+mod undo;
 
-pub use draw_reply::DrawReply;
-pub use game_state_reply::GameStateReply;
-pub use legal_moves_reply::LegalMovesReply;
-pub use make_move_reply::MakeMoveReply;
-pub use placement_reply::PlacementReply;
-pub use resign_reply::ResignReply;
-pub use screenshot_reply::ScreenshotReply;
-pub use undo_reply::UndoReply;
+pub use draw::DrawReply;
+pub use game_state::GameStateReply;
+pub use legal_moves::LegalMovesReply;
+pub use make_move::MakeMoveReply;
+pub use placement::PlacementReply;
+pub use resign::ResignReply;
+pub use screenshot::ScreenshotReply;
+pub use undo::UndoReply;
 
 /// Serializes a reply payload to its JSON wire value (`null` only if a
 /// `Serialize` impl ever fails, which derived impls on these payloads

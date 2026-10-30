@@ -46,7 +46,7 @@ impl ServerHandler for ChessMcp {
         &self,
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> {
+    ) -> impl Future<Output = Result<ListResourcesResult, ErrorData>> {
         std::future::ready(Ok(ListResourcesResult::with_all_items(vec![
             Resource::new(crate::GAME_STATE_URI, "game-state")
                 .with_title("Live game state")
@@ -76,7 +76,7 @@ impl ServerHandler for ChessMcp {
     }
 
     #[allow(deprecated)]
-    fn subscribe(&self, request: SubscribeRequestParams, context: RequestContext<RoleServer>) -> impl std::future::Future<Output = Result<(), ErrorData>> {
+    fn subscribe(&self, request: SubscribeRequestParams, context: RequestContext<RoleServer>) -> impl Future<Output = Result<(), ErrorData>> {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             subscribers.push((request.uri, context.peer.clone()));
         }
@@ -84,7 +84,7 @@ impl ServerHandler for ChessMcp {
     }
 
     #[allow(deprecated)]
-    fn unsubscribe(&self, request: UnsubscribeRequestParams, _context: RequestContext<RoleServer>) -> impl std::future::Future<Output = Result<(), ErrorData>> {
+    fn unsubscribe(&self, request: UnsubscribeRequestParams, _context: RequestContext<RoleServer>) -> impl Future<Output = Result<(), ErrorData>> {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             subscribers.retain(|(uri, _)| uri != &request.uri);
         }
