@@ -1,5 +1,6 @@
 mod controller;
 mod l10n;
+mod playable;
 mod replayable;
 mod rotatable;
 mod settings;

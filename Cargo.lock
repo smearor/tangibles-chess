@@ -2947,6 +2947,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "shakmaty",
  "tangibles-chess-core",
  "tokio",
  "tracing",

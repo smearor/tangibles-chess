@@ -38,6 +38,9 @@ use serde::Serialize;
 use tracing::error;
 use tracing::info;
 
+use tangibles_chess_core::Side;
+use tangibles_chess_core::Uci;
+
 use crate::CommandKind;
 use crate::GameRequest;
 
@@ -104,13 +107,19 @@ impl ChessMcp {
     /// All legal moves of the side to move, in UCI notation.
     #[tool(description = "List legal moves in UCI notation; optionally restricted to one origin square.")]
     async fn legal_moves(&self, Parameters(args): Parameters<LegalMovesArgs>) -> Result<CallToolResult, ErrorData> {
-        self.dispatch(CommandKind::LegalMoves { square: args.square }).await
+        let square = args
+            .square
+            .as_deref()
+            .map(str::parse)
+            .transpose()
+            .map_err(|_| ErrorData::invalid_params("invalid square name", None))?;
+        self.dispatch(CommandKind::LegalMoves { square }).await
     }
 
     /// Apply a move given in UCI notation.
     #[tool(description = "Make a move in UCI notation, e.g. 'e2e4' or 'e7e8q' for promotion.")]
     async fn make_move(&self, Parameters(args): Parameters<MakeMoveArgs>) -> Result<CallToolResult, ErrorData> {
-        self.dispatch(CommandKind::MakeMove { uci: args.uci }).await
+        self.dispatch(CommandKind::MakeMove { uci: Uci::from(args.uci) }).await
     }
 
     /// Take back the last half-move (returns the physical undo plan).
@@ -122,7 +131,11 @@ impl ChessMcp {
     /// Resign for one side.
     #[tool(description = "Resign the game for 'white' or 'black'.")]
     async fn resign(&self, Parameters(args): Parameters<ResignArgs>) -> Result<CallToolResult, ErrorData> {
-        self.dispatch(CommandKind::Resign { color: args.color }).await
+        let color = args
+            .color
+            .parse::<Side>()
+            .map_err(|_| ErrorData::invalid_params("color must be 'white' or 'black'", None))?;
+        self.dispatch(CommandKind::Resign { color }).await
     }
 
     /// Agree to a draw.

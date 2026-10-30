@@ -15,6 +15,7 @@ use crate::controller::GameController;
 use crate::controller::set_active_controller;
 use crate::controller::with_controller;
 use crate::l10n::L10n;
+use crate::playable::Playable;
 use crate::replayable::Replayable;
 use crate::rotatable::Rotatable;
 use crate::settings::AppSettings;

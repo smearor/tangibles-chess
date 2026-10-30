@@ -1,9 +1,14 @@
 //! The command protocol between the MCP thread and the GTK main loop.
 
+use shakmaty::Square;
+use tangibles_chess_core::Side;
+use tangibles_chess_core::Uci;
+
 /// One command a tool can dispatch to the game controller.
 ///
 /// The GTK side executes it against the live session and answers with a
-/// JSON value on `reply`.
+/// JSON value on `reply`. Arguments arrive pre-validated: the tool
+/// boundary rejects malformed input before a command is built.
 #[derive(Debug)]
 pub enum CommandKind {
     /// Snapshot: phase, turn, FEN, SAN history, outcome, config.
@@ -11,19 +16,19 @@ pub enum CommandKind {
     /// Legal moves in UCI notation; `square` narrows to one origin.
     LegalMoves {
         /// Optional origin square like `"e2"`.
-        square: Option<String>,
+        square: Option<Square>,
     },
     /// Apply a move in UCI notation (`"e2e4"`, `"e7e8q"`).
     MakeMove {
         /// UCI move text.
-        uci: String,
+        uci: Uci,
     },
     /// Undo the last half-move; returns the physical undo plan.
     Undo,
     /// Resign for `white` or `black`.
     Resign {
-        /// `"white"` or `"black"`.
-        color: String,
+        /// The resigning side.
+        color: Side,
     },
     /// Agree a draw.
     AgreeDraw,
