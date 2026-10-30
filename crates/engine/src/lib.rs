@@ -5,8 +5,12 @@
 //! Used by the app for AI opponents; blocking calls happen on dedicated
 //! threads so the GTK main loop never stalls.
 
-mod engine_client;
-mod engine_error;
+mod client;
+mod command;
+mod error;
+mod response;
 
-pub use engine_client::EngineClient;
-pub use engine_error::EngineError;
+pub use client::EngineClient;
+pub use command::EngineCommand;
+pub use error::EngineError;
+pub use response::EngineResponse;

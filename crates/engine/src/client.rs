@@ -11,9 +11,11 @@ use std::time::Instant;
 
 use shakmaty::Chess;
 use shakmaty::Move;
-use shakmaty::uci::UciMove;
+use tangibles_chess_core::Fen;
 
 use crate::EngineError;
+use crate::command::EngineCommand;
+use crate::response::EngineResponse;
 
 /// A running UCI engine process.
 ///
@@ -44,71 +46,71 @@ impl EngineClient {
             }
         });
         let mut engine = Self { child, stdin, lines };
-        engine.send("uci")?;
-        engine.expect_line("uciok", Duration::from_secs(5))?;
-        engine.send("isready")?;
-        engine.expect_line("readyok", Duration::from_secs(5))?;
+        engine.send(&EngineCommand::Uci)?;
+        engine.expect_response(&EngineResponse::UciOk, Duration::from_secs(5))?;
+        engine.send(&EngineCommand::IsReady)?;
+        engine.expect_response(&EngineResponse::ReadyOk, Duration::from_secs(5))?;
         Ok(engine)
     }
 
     /// Sends one command line to the engine.
-    pub fn send(&mut self, command: &str) -> Result<(), EngineError> {
+    pub fn send(&mut self, command: &EngineCommand) -> Result<(), EngineError> {
         writeln!(self.stdin, "{command}")?;
         self.stdin.flush()?;
         Ok(())
     }
 
-    /// Waits for a line whose first word equals `expected`, within
+    /// Waits for a response whose keyword matches `expected`'s, within
     /// `timeout`. Intermediate lines are consumed and discarded.
-    fn expect_line(&mut self, expected: &str, timeout: Duration) -> Result<String, EngineError> {
+    fn expect_response(&mut self, expected: &EngineResponse, timeout: Duration) -> Result<EngineResponse, EngineError> {
         let deadline = Instant::now() + timeout;
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return Err(EngineError::Protocol(format!("timeout waiting for `{expected}`")));
+                return Err(EngineError::Protocol(format!("timeout waiting for `{}`", expected.keyword())));
             }
             let line = self
                 .lines
                 .recv_timeout(remaining)
-                .map_err(|_| EngineError::Protocol(format!("timeout waiting for `{expected}`")))?;
-            if line.starts_with(expected) {
-                return Ok(line);
+                .map_err(|_| EngineError::Protocol(format!("timeout waiting for `{}`", expected.keyword())))?;
+            let response = EngineResponse::parse(&line);
+            if response.keyword() == expected.keyword() {
+                return Ok(response);
             }
         }
     }
 
     /// Starts a fresh game (`ucinewgame`).
     pub fn new_game(&mut self) -> Result<(), EngineError> {
-        self.send("ucinewgame")?;
+        self.send(&EngineCommand::UciNewGame)?;
         Ok(())
     }
 
     /// Plays moves on the current game and asks for a move at `depth`.
-    pub fn best_move(&mut self, position: &Chess, fen: &str, depth: u32) -> Result<Option<Move>, EngineError> {
-        self.send(&format!("position fen {fen}"))?;
-        self.send(&format!("go depth {depth}"))?;
+    pub fn best_move(&mut self, position: &Chess, fen: &Fen, depth: u32) -> Result<Option<Move>, EngineError> {
+        self.send(&EngineCommand::Position { fen: fen.clone() })?;
+        self.send(&EngineCommand::Go { depth })?;
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                self.send("stop")?;
+                self.send(&EngineCommand::Stop)?;
                 return Err(EngineError::Protocol("no bestmove in time".to_string()));
             }
             let Ok(line) = self.lines.recv_timeout(remaining) else {
-                self.send("stop")?;
+                self.send(&EngineCommand::Stop)?;
                 return Err(EngineError::Protocol("no bestmove in time".to_string()));
             };
-            if let Some(best) = line.strip_prefix("bestmove ") {
-                let token = best.split_whitespace().next().unwrap_or_default();
-                if token == "(none)" || token.is_empty() {
-                    return Ok(None);
+            match EngineResponse::parse(&line) {
+                EngineResponse::BestMove(mv) => {
+                    return mv
+                        .map(|uci| uci.to_move(position).map_err(|_| EngineError::Protocol("bestmove not legal".to_string())))
+                        .transpose();
                 }
-                return token
-                    .parse::<UciMove>()
-                    .ok()
-                    .and_then(|uci| uci.to_move(position).ok())
-                    .map(Some)
-                    .ok_or_else(|| EngineError::Protocol(format!("illegal bestmove `{token}`")));
+                EngineResponse::InvalidBestMove(token) => {
+                    return Err(EngineError::Protocol(format!("illegal bestmove `{token}`")));
+                }
+                _ => {}
             }
         }
     }
@@ -116,7 +118,7 @@ impl EngineClient {
 
 impl Drop for EngineClient {
     fn drop(&mut self) {
-        let _ = self.send("quit");
+        let _ = self.send(&EngineCommand::Quit);
         let _ = self.child.kill();
     }
 }

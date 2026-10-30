@@ -1,20 +1,20 @@
 //! Spawning the Streamable-HTTP endpoint.
 
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::thread::JoinHandle;
+use async_channel::Sender;
 use rmcp::RoleServer;
 use rmcp::model::ResourceUpdatedNotificationParam;
 use rmcp::service::Peer;
 use rmcp::transport::streamable_http_server::StreamableHttpServerConfig;
 use rmcp::transport::streamable_http_server::StreamableHttpService;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
+use serde_json::Value;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::thread::JoinHandle;
+use tokio::sync::watch::Receiver;
 use tracing::error;
 use tracing::info;
-use tokio::sync::watch::Receiver;
-use async_channel::Sender;
-use serde_json::Value;
 
 use super::chess_mcp::ChessMcp;
 use crate::GameRequest;
@@ -24,11 +24,7 @@ use crate::GameRequest;
 ///
 /// The default host allowlist is localhost-only - LAN deployments must
 /// allow their own bound address.
-pub fn spawn_http(
-    tx: Sender<GameRequest>,
-    addr: SocketAddr,
-    state_watch: Receiver<Value>,
-) -> JoinHandle<()> {
+pub fn spawn_http(tx: Sender<GameRequest>, addr: SocketAddr, state_watch: Receiver<Value>) -> JoinHandle<()> {
     std::thread::spawn(move || {
         let runtime = match tokio::runtime::Runtime::new() {
             Ok(runtime) => runtime,
