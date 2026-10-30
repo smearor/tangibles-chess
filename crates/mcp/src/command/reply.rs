@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::command_error::CommandError;
+use super::error::CommandError;
 use crate::reply::DrawReply;
 use crate::reply::GameStateReply;
 use crate::reply::LegalMovesReply;

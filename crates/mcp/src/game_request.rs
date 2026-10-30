@@ -2,7 +2,7 @@
 //! GTK main loop.
 
 use crate::command::CommandKind;
-use crate::command_reply::CommandReply;
+use crate::command::CommandReply;
 use tokio::sync::oneshot::Sender;
 
 /// A command plus the channel back to the waiting tool call.
