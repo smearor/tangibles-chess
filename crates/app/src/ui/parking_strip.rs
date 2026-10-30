@@ -1,6 +1,6 @@
 //! A captured-piece parking strip beside the board.
 
-use shakmaty::Piece;
+use tangibles_chess_core::Piece;
 use tangibles_chess_tangibles::CapSide;
 
 use crate::ui::cap_cell::CapCell;

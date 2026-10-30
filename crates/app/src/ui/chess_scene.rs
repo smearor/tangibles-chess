@@ -8,12 +8,11 @@ use gtk4::graphene;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use shakmaty::Chess;
-use shakmaty::Piece;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_core::BoardTheme;
+use tangibles_chess_core::Piece;
 
-use crate::piece_icons::piece_icon_name;
 use crate::theme::TextureLayout;
 use crate::theme::ThemePalette;
 use crate::ui::parking_strip::ParkingStrip;
@@ -114,6 +113,7 @@ pub(crate) enum FlashRole {
 /// bottom-right); the `RotationWidget` handles the physical orientation.
 /// All input arrives already un-rotated in scene coordinates.
 mod imp {
+    use gtk4::{IconLookupFlags, TextDirection};
     use super::*;
 
     /// Implementation state of [`ChessScene`].
@@ -316,7 +316,7 @@ mod imp {
             if state.render_pieces {
                 let scale = self.obj().scale_factor();
                 let paint_piece = |piece: Piece, x: f64, y: f64| {
-                    let name = piece_icon_name(piece);
+                    let name = piece.icon_name();
                     let paintable = {
                         let mut cache = self.paintables.borrow_mut();
                         cache
@@ -327,15 +327,15 @@ mod imp {
                                     &[],
                                     cell as i32,
                                     scale,
-                                    gtk4::TextDirection::None,
-                                    gtk4::IconLookupFlags::empty(),
+                                    TextDirection::None,
+                                    IconLookupFlags::empty(),
                                 )
                             })
                             .clone()
                     };
                     snapshot.save();
                     snapshot.translate(&graphene::Point::new(x as f32, y as f32));
-                    if piece.color == shakmaty::Color::Black {
+                    if piece.side == tangibles_chess_core::Side::Black {
                         // The north player faces their own pieces: flip
                         // black glyphs around the cell centre so they are
                         // readable upside down.
@@ -357,7 +357,7 @@ mod imp {
                         let scene = square_scene(square);
                         let x = bx + (scene % 8) as f64 * cell;
                         let y = by + (scene / 8) as f64 * cell;
-                        paint_piece(piece, x, y);
+                        paint_piece(Piece::from(piece), x, y);
                     }
                 }
                 // Parked captured pieces on the cap strips

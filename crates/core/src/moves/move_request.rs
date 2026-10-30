@@ -1,6 +1,6 @@
+use crate::Role;
 use shakmaty::File;
 use shakmaty::Move;
-use shakmaty::Role;
 use shakmaty::Square;
 
 /// A requested move between two squares, as produced by touch input or

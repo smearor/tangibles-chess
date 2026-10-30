@@ -1,6 +1,6 @@
 //! A single captured-piece parking cell beside the board.
 
-use shakmaty::Piece;
+use tangibles_chess_core::Piece;
 
 /// One cell of a captured-piece parking strip: whether a physical
 /// marker rests on it and which captured piece renders there.

@@ -1,8 +1,8 @@
 use shakmaty::Chess;
-use shakmaty::Piece;
 use shakmaty::Position;
 use shakmaty::Square;
 
+use crate::Piece;
 use crate::UndoStep;
 
 /// Physical steps needed to revert one move on the board.
@@ -27,8 +27,8 @@ impl UndoPlan {
     /// pawn→role mismatch on the same side); unmatched removals are
     /// captured pieces that must be placed back.
     pub fn between(before: &Chess, after: &Chess) -> Self {
-        let mut removed: Vec<(Square, Piece)> = Vec::new();
-        let mut arrived: Vec<(Square, Piece)> = Vec::new();
+        let mut removed: Vec<(Square, shakmaty::Piece)> = Vec::new();
+        let mut arrived: Vec<(Square, shakmaty::Piece)> = Vec::new();
         for square in Square::ALL {
             let was = before.board().piece_at(square);
             let is = after.board().piece_at(square);
@@ -67,7 +67,7 @@ impl UndoPlan {
             if !consumed.contains(&index) {
                 steps.push(UndoStep::Restore {
                     square: *square,
-                    piece: *piece,
+                    piece: Piece::from(*piece),
                 });
             }
         }
@@ -84,15 +84,15 @@ impl UndoPlan {
 mod tests {
     use shakmaty::CastlingMode;
     use shakmaty::Chess;
-    use shakmaty::Color;
-    use shakmaty::Piece;
     use shakmaty::Position;
-    use shakmaty::Role;
     use shakmaty::Square;
     use shakmaty::fen::Fen;
     use shakmaty::uci::UciMove;
 
     use super::UndoPlan;
+    use crate::Piece;
+    use crate::Role;
+    use crate::Side;
     use crate::UndoStep;
 
     fn play_uci(pos: &Chess, uci: &str) -> Chess {
@@ -133,7 +133,7 @@ mod tests {
                 UndoStep::Restore {
                     square: Square::D5,
                     piece: Piece {
-                        color: Color::Black,
+                        side: Side::Black,
                         role: Role::Pawn
                     }
                 }
@@ -161,7 +161,7 @@ mod tests {
                 UndoStep::Restore {
                     square: Square::D5,
                     piece: Piece {
-                        color: Color::Black,
+                        side: Side::Black,
                         role: Role::Pawn
                     }
                 }

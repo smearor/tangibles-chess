@@ -16,9 +16,7 @@ use gtk4::prelude::WidgetExt;
 use libadwaita as adw;
 use shakmaty::Color;
 use shakmaty::KnownOutcome;
-use shakmaty::Piece;
 use shakmaty::Position;
-use shakmaty::Role;
 use shakmaty::Square;
 use tangibles_chess_core::DrawReason;
 use tangibles_chess_core::GameConfig;
@@ -26,7 +24,9 @@ use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::GameSession;
 use tangibles_chess_core::MoveOutcome;
 use tangibles_chess_core::MoveRequest;
+use tangibles_chess_core::Piece;
 use tangibles_chess_core::Ply;
+use tangibles_chess_core::Role;
 use tangibles_chess_core::Side;
 use tangibles_chess_core::TangibleMode;
 use tangibles_chess_core::Uci;
@@ -394,7 +394,7 @@ impl GameController {
                     .collect();
                 tangibles_chess_mcp::to_value(&LegalMovesReply {
                     legal_moves: moves,
-                    turn: Side::from(self.session.turn()),
+                    turn: self.session.turn(),
                 })
             }
             CommandKind::MakeMove { uci } => {
@@ -410,7 +410,7 @@ impl GameController {
                 let request = MoveRequest {
                     from: mv.from().unwrap_or_else(|| mv.to()),
                     to: mv.to(),
-                    promotion: mv.promotion(),
+                    promotion: mv.promotion().map(Role::from),
                 };
                 match self.apply_request(request) {
                     MoveOutcome::Applied(san) => tangibles_chess_mcp::to_value(&MakeMoveReply::Applied {
@@ -549,7 +549,7 @@ impl GameController {
         let config = self.session.config();
         GameStateReply {
             phase: self.session.phase(),
-            turn: Side::from(self.session.turn()),
+            turn: self.session.turn(),
             fen: self.session.fen(),
             san_history: self.session.san_history().to_vec(),
             uci_history: self.session.uci_history().to_vec(),
@@ -643,12 +643,12 @@ impl GameController {
         // Per-side status lines: each player only sees what concerns
         // them - own placed count, own missing pieces, shared extras.
         let position = self.session.position().clone();
-        for color in [Color::White, Color::Black] {
-            let own = |square: Square| position.board().piece_at(square).is_some_and(|piece| piece.color == color);
+        for side in Side::ALL {
+            let own = |square: Square| position.board().piece_at(square).is_some_and(|piece| Side::from(piece.color) == side);
             let placed = status.correct.iter().copied().filter(|square| own(*square)).count();
             let missing: Vec<Square> = status.missing.iter().copied().filter(|square| own(*square)).collect();
             let text = self.placement_line(placed, &missing, &status);
-            self.screen.set_instruction(color, &text);
+            self.screen.set_instruction(side, &text);
         }
         if status.is_consistent() {
             self.session.confirm_placement();
@@ -690,7 +690,7 @@ impl GameController {
         {
             let square = self.geometry.field_to_square(*index);
             let own = self.session.position().board().piece_at(square);
-            let lifted = own.filter(|p| p.color == self.session.turn()).map(|_| square);
+            let lifted = own.filter(|p| Side::from(p.color) == self.session.turn()).map(|_| square);
             self.screen.surface.scene.update(|state| {
                 state.lifted = lifted;
                 if let Some(lifted) = lifted {
@@ -872,7 +872,7 @@ impl GameController {
                 .position()
                 .board()
                 .piece_at(square)
-                .is_some_and(|piece| piece.color == self.session.turn());
+                .is_some_and(|piece| Side::from(piece.color) == self.session.turn());
             if !own {
                 // Tapped an invalid destination for the selection -
                 // flash the rejected square and keep the selection.
@@ -887,7 +887,7 @@ impl GameController {
             .position()
             .board()
             .piece_at(square)
-            .is_some_and(|piece| piece.color == self.session.turn());
+            .is_some_and(|piece| Side::from(piece.color) == self.session.turn());
         self.selected = own.then_some(square);
         let targets = self.selected.map(|s| self.session.legal_targets(s)).unwrap_or_default();
         self.screen.surface.scene.update(|state| {
@@ -900,11 +900,11 @@ impl GameController {
     /// the UI. Returns the session's outcome for remote callers.
     pub fn apply_request(&mut self, request: MoveRequest) -> MoveOutcome {
         let mover = self.session.turn();
-        let victim = self.session.position().board().piece_at(request.to).or_else(|| {
+        let victim = self.session.position().board().piece_at(request.to).map(Piece::from).or_else(|| {
             // En passant: the taken pawn is not on the target square.
             let moving = self.session.position().board().piece_at(request.from)?;
-            (moving.role == Role::Pawn && request.from.file() != request.to.file()).then_some(Piece {
-                color: mover.other(),
+            (moving.role == shakmaty::Role::Pawn && request.from.file() != request.to.file()).then_some(Piece {
+                side: mover.other(),
                 role: Role::Pawn,
             })
         });
@@ -946,19 +946,9 @@ impl GameController {
 
     /// Status-line notice for a capture, shown on both sides:
     /// "{color} captures {piece} on {square}".
-    fn capture_notice(&self, mover: Color, victim: Piece, square: Square) -> String {
-        let color_key = match mover {
-            Color::White => "color-white",
-            Color::Black => "color-black",
-        };
-        let piece_key = match victim.role {
-            Role::Pawn => "piece-pawn",
-            Role::Knight => "piece-knight",
-            Role::Bishop => "piece-bishop",
-            Role::Rook => "piece-rook",
-            Role::Queen => "piece-queen",
-            Role::King => "piece-king",
-        };
+    fn capture_notice(&self, mover: Side, victim: Piece, square: Square) -> String {
+        let color_key = mover.l10n_key();
+        let piece_key = victim.role.l10n_key();
         let mut args = FluentArgs::new();
         args.set("color", self.l10n.msg(color_key).to_string());
         args.set("piece", self.l10n.msg(piece_key).to_string());
@@ -994,8 +984,8 @@ impl GameController {
     fn show_promotion_picker(&self, _to: Square) {
         let mover = self.session.turn();
         let facing_north = match mover {
-            Color::White => self.geometry.white_edge() == TableEdge::North,
-            Color::Black => self.geometry.black_edge() == TableEdge::North,
+            Side::White => self.geometry.white_edge() == TableEdge::North,
+            Side::Black => self.geometry.black_edge() == TableEdge::North,
         };
         let picker = PromotionPicker::new(
             mover,
@@ -1218,16 +1208,16 @@ impl GameController {
         if self.session.phase() == GamePhase::Finished {
             if let Some(index) = self.replay_index {
                 let label = format!("{} {}/{}", self.l10n.msg("game-replay"), index, self.session.ply_count());
-                self.screen.set_instruction(Color::White, &label);
-                self.screen.set_instruction(Color::Black, &label);
+                self.screen.set_instruction(Side::White, &label);
+                self.screen.set_instruction(Side::Black, &label);
             } else {
                 self.show_result();
             }
         } else if self.session.phase() == GamePhase::AwaitingPlacement {
             self.update_placement();
         } else {
-            self.screen.set_instruction(Color::White, if active { &turn_text } else { "" });
-            self.screen.set_instruction(Color::Black, if !active { &turn_text } else { "" });
+            self.screen.set_instruction(Side::White, if active { &turn_text } else { "" });
+            self.screen.set_instruction(Side::Black, if !active { &turn_text } else { "" });
         }
         self.screen.surface.white_panel.set_active(active);
         self.screen.surface.black_panel.set_active(!active);

@@ -1,6 +1,5 @@
 mod controller;
 mod l10n;
-mod piece_icons;
 mod settings;
 mod sound;
 mod tangible_host;

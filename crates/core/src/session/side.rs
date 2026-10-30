@@ -7,7 +7,7 @@ use shakmaty::Color;
 /// One of the two player colors - the domain spelling used on the wire
 /// (`"white"`/`"black"` in saves and MCP arguments) instead of raw
 /// strings or `shakmaty::Color` leaking through boundaries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
     /// The white side.
@@ -17,11 +17,22 @@ pub enum Side {
 }
 
 impl Side {
+    /// Both sides, white first.
+    pub const ALL: [Self; 2] = [Self::White, Self::Black];
+
     /// The other side.
     pub fn other(self) -> Self {
         match self {
             Self::White => Self::Black,
             Self::Black => Self::White,
+        }
+    }
+
+    /// The Fluent key naming this side (`color-white`/`color-black`).
+    pub fn l10n_key(&self) -> &'static str {
+        match self {
+            Self::White => "color-white",
+            Self::Black => "color-black",
         }
     }
 
@@ -92,7 +103,7 @@ mod tests {
 
     #[test]
     fn display_round_trips_through_parse() {
-        for side in [Side::White, Side::Black] {
+        for side in Side::ALL {
             assert_eq!(side.to_string().parse::<Side>(), Ok(side));
         }
         assert!("green".parse::<Side>().is_err());

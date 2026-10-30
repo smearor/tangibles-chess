@@ -1,11 +1,8 @@
 use shakmaty::Chess;
-use shakmaty::Color;
 use shakmaty::EnPassantMode;
 use shakmaty::KnownOutcome;
 use shakmaty::Move;
-use shakmaty::Piece;
 use shakmaty::Position;
-use shakmaty::Role;
 use shakmaty::Square;
 use shakmaty::zobrist::Zobrist64;
 
@@ -18,7 +15,9 @@ use crate::GamePhase;
 use crate::IllegalReason;
 use crate::MoveOutcome;
 use crate::MoveRequest;
+use crate::Piece;
 use crate::Ply;
+use crate::Role;
 use crate::San;
 use crate::SavedGame;
 use crate::Side;
@@ -156,8 +155,8 @@ impl GameSession {
     }
 
     /// Side to move.
-    pub fn turn(&self) -> Color {
-        self.position.turn()
+    pub fn turn(&self) -> Side {
+        Side::from(self.position.turn())
     }
 
     /// Pieces captured so far (material diff against the starting
@@ -167,11 +166,12 @@ impl GameSession {
     pub fn captured_pieces(&self) -> Vec<Piece> {
         let initial = self.past.first().unwrap_or(&self.position);
         let mut captured = Vec::new();
-        for color in [Color::White, Color::Black] {
-            for role in [Role::Queen, Role::Rook, Role::Bishop, Role::Knight, Role::Pawn] {
-                let piece = Piece { color, role };
-                let before = initial.board().by_piece(piece).count();
-                let now = self.position.board().by_piece(piece).count();
+        for side in Side::ALL {
+            for role in Role::CAPTURABLE {
+                let piece = Piece { side, role };
+                let query = shakmaty::Piece::from(piece);
+                let before = initial.board().by_piece(query).count();
+                let now = self.position.board().by_piece(query).count();
                 captured.extend(std::iter::repeat_n(piece, before.saturating_sub(now)));
             }
         }
@@ -234,7 +234,7 @@ impl GameSession {
     /// the check question in practice.
     pub fn projected_check(&self, request: &MoveRequest) -> Option<CheckProjection> {
         let piece = self.position.board().piece_at(request.from)?;
-        if piece.color != self.turn() {
+        if Side::from(piece.color) != self.turn() {
             return None;
         }
         let mut board = self.position.board().clone();
@@ -398,7 +398,7 @@ impl GameSession {
 
 /// Promoted role of a move, or `None`.
 fn promotion_role(mv: &Move) -> Option<Role> {
-    mv.promotion()
+    mv.promotion().map(Role::from)
 }
 
 #[cfg(test)]
@@ -406,7 +406,6 @@ mod tests {
     use shakmaty::Chess;
     use shakmaty::Color;
     use shakmaty::Position;
-    use shakmaty::Role;
     use shakmaty::Square;
 
     use super::GameSession;
@@ -415,6 +414,7 @@ mod tests {
     use crate::MoveOutcome;
     use crate::MoveRequest;
     use crate::Ply;
+    use crate::Role;
     use crate::San;
     use crate::Side;
     use crate::TangibleMode;
@@ -452,7 +452,7 @@ mod tests {
         if let MoveOutcome::Applied(san) = outcome {
             assert_eq!(san.as_str(), "e4");
         }
-        assert_eq!(session.turn(), Color::Black);
+        assert_eq!(session.turn(), Side::Black);
         assert_eq!(session.san_history(), &[San::from("e4")]);
     }
 
@@ -461,7 +461,7 @@ mod tests {
         let mut session = session();
         let outcome = session.request_move(MoveRequest::new(Square::E2, Square::E5));
         assert!(matches!(outcome, MoveOutcome::Illegal(_)));
-        assert_eq!(session.turn(), Color::White);
+        assert_eq!(session.turn(), Side::White);
     }
 
     #[test]
@@ -503,7 +503,7 @@ mod tests {
         let plan = session.undo().expect("undo");
         assert!(!plan.is_empty());
         assert_eq!(session.san_history().len(), 0);
-        assert_eq!(session.turn(), Color::White);
+        assert_eq!(session.turn(), Side::White);
     }
 
     #[test]
@@ -529,7 +529,7 @@ mod tests {
         assert!(session.can_redo());
         assert!(session.redo().is_some());
         assert_eq!(session.san_history(), &[San::from("e4"), San::from("e5")]);
-        assert_eq!(session.turn(), Color::White);
+        assert_eq!(session.turn(), Side::White);
         assert!(!session.can_redo());
     }
 

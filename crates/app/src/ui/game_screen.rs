@@ -4,11 +4,11 @@ use std::rc::Rc;
 
 use gtk4::prelude::*;
 use libadwaita as adw;
-use shakmaty::Color;
 use smearor_wrot_rotation::RotationWidget;
 use smearor_wrot_rotation::SmearorRotation;
 use tangibles_chess_core::BoardOrientation;
 use tangibles_chess_core::GameConfig;
+use tangibles_chess_core::Side;
 
 use crate::l10n::L10n;
 use crate::ui::player_panel::PanelActions;
@@ -147,23 +147,23 @@ impl GameScreen {
     }
 
     /// The status line of `color`'s side.
-    fn line(&self, color: Color) -> &StatusLine {
-        match color {
-            Color::White => &self.white_line,
-            Color::Black => &self.black_line,
+    fn line(&self, side: Side) -> &StatusLine {
+        match side {
+            Side::White => &self.white_line,
+            Side::Black => &self.black_line,
         }
     }
 
-    /// Persistent instruction on `color`'s status line (e.g. "White to
+    /// Persistent instruction on `side`'s status line (e.g. "White to
     /// move"); empty text clears the line.
-    pub fn set_instruction(&self, color: Color, text: &str) {
-        self.line(color).set(text);
+    pub fn set_instruction(&self, side: Side, text: &str) {
+        self.line(side).set(text);
     }
 
-    /// Transient message on `color`'s status line - for errors caused
+    /// Transient message on `side`'s status line - for errors caused
     /// by that side, like a rejected move or a protocol anomaly.
-    pub fn show_message_for(&self, color: Color, text: &str) {
-        self.line(color).flash(text, STATUS_MESSAGE_MS);
+    pub fn show_message_for(&self, side: Side, text: &str) {
+        self.line(side).flash(text, STATUS_MESSAGE_MS);
     }
 
     /// Transient message on both status lines.
