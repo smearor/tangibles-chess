@@ -23,3 +23,13 @@ pub enum UndoStep {
         piece: Piece,
     },
 }
+
+impl std::fmt::Display for UndoStep {
+    /// Human-readable instruction (`"move e4 back to e2"`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MoveBack { from, to } => write!(f, "move {to} back to {from}"),
+            Self::Restore { square, piece } => write!(f, "restore {piece:?} on {square}"),
+        }
+    }
+}

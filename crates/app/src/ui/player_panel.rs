@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use gtk4::prelude::*;
-use shakmaty::Color;
+use tangibles_chess_core::Side;
 use tangibles_chess_icons::icon_names;
 
 /// Per-player edge panel: name, captured-material tray display and the
@@ -40,28 +40,27 @@ pub struct PanelActions {
     pub on_redo: Option<Rc<dyn Fn()>>,
     /// Draw offer/claim.
     pub on_draw: Option<Rc<dyn Fn()>>,
-    /// Resign for the panel's color.
-    pub on_resign: Option<Rc<dyn Fn(Color)>>,
-    /// Rotate request (only used on the shared toolbar).
+    /// Resign for the panel's side.
+    pub on_resign: Option<Rc<dyn Fn(Side)>>,
+    /// Rotate-clockwise request (only used on the shared toolbar).
     pub on_rotate: Option<Rc<dyn Fn()>>,
+    /// Rotate-counter-clockwise request (only used on the shared toolbar).
+    pub on_rotate_ccw: Option<Rc<dyn Fn()>>,
     /// Leave replay mode back to the result dialog.
     pub on_exit_replay: Option<Rc<dyn Fn()>>,
 }
 
 impl PlayerPanel {
-    /// A panel for `color` bound to `actions`/`l10n` texts. The panel's
+    /// A panel for `side` bound to `actions`/`l10n` texts. The panel's
     /// background takes the player's color instead of a name label.
-    pub fn new(color: Color, actions: &PanelActions, l10n: &crate::l10n::L10n) -> Self {
+    pub fn new(side: Side, actions: &PanelActions, l10n: &crate::l10n::L10n) -> Self {
         // Overlay instead of a box: the buttons sit at the panel's true
         // center and the captured tray floats at the left edge, so the
         // panel stays only as wide as the button row instead of
         // spilling past the screen edge.
         let widget = gtk4::Overlay::new();
         widget.add_css_class("player-panel");
-        widget.add_css_class(match color {
-            Color::White => "panel-white",
-            Color::Black => "panel-black",
-        });
+        widget.add_css_class(side.css_class());
         widget.set_halign(gtk4::Align::Center);
         widget.set_margin_start(24);
         widget.set_margin_end(24);
@@ -88,12 +87,17 @@ impl PlayerPanel {
         let resign = Self::control_button(icon_names::TCH_FLAG_SYMBOLIC, &l10n.msg("game-resign"));
         if let Some(on_resign) = &actions.on_resign {
             let on_resign = on_resign.clone();
-            resign.connect_clicked(move |_| on_resign(color));
+            resign.connect_clicked(move |_| on_resign(side));
         }
         let rotate = Self::control_button(icon_names::TCH_ROTATE_CW_SYMBOLIC, &l10n.msg("game-rotate"));
         if let Some(on_rotate) = &actions.on_rotate {
             let on_rotate = on_rotate.clone();
             rotate.connect_clicked(move |_| on_rotate());
+        }
+        let rotate_ccw = Self::control_button(icon_names::TCH_ROTATE_CCW_SYMBOLIC, &l10n.msg("game-rotate-ccw"));
+        if let Some(on_rotate_ccw) = &actions.on_rotate_ccw {
+            let on_rotate_ccw = on_rotate_ccw.clone();
+            rotate_ccw.connect_clicked(move |_| on_rotate_ccw());
         }
         // Back to the setup dialog; the running game stays alive in the
         // window's stack.
@@ -111,6 +115,7 @@ impl PlayerPanel {
         buttons.append(&draw);
         buttons.append(&resign);
         buttons.append(&rotate);
+        buttons.append(&rotate_ccw);
         buttons.append(&menu);
         buttons.append(&exit_replay);
 

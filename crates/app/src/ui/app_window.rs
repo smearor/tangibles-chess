@@ -179,8 +179,9 @@ impl AppWindow {
             on_undo: Some(Rc::new(|| with_controller(|c| c.borrow_mut().undo()))),
             on_redo: Some(Rc::new(|| with_controller(|c| c.borrow_mut().redo()))),
             on_draw: Some(Rc::new(|| with_controller(|c| c.borrow_mut().draw()))),
-            on_resign: Some(Rc::new(|color| with_controller(|c| c.borrow_mut().resign(color)))),
+            on_resign: Some(Rc::new(|side| with_controller(|c| c.borrow_mut().resign(side)))),
             on_rotate: Some(Rc::new(|| with_controller(|c| c.borrow_mut().rotate_cw()))),
+            on_rotate_ccw: Some(Rc::new(|| with_controller(|c| c.borrow_mut().rotate_ccw()))),
             on_exit_replay: Some(Rc::new(|| with_controller(|c| c.borrow_mut().exit_replay()))),
         };
 

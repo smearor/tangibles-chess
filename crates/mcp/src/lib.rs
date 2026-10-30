@@ -7,10 +7,21 @@
 //! and awaits the reply on a tokio oneshot.
 
 mod command;
+mod reply;
 mod server;
 
 pub use command::CommandKind;
 pub use command::GameRequest;
+pub use reply::DrawReply;
+pub use reply::ErrorReply;
+pub use reply::GameStateReply;
+pub use reply::LegalMovesReply;
+pub use reply::MakeMoveReply;
+pub use reply::PlacementReply;
+pub use reply::ResignReply;
+pub use reply::ScreenshotReply;
+pub use reply::UndoReply;
+pub use reply::to_value;
 pub use server::spawn_http;
 
 /// URI of the live game-state resource (`resources/read` +

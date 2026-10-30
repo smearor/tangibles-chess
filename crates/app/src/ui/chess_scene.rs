@@ -8,6 +8,7 @@ use gtk4::graphene;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use shakmaty::Chess;
+use shakmaty::Piece;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_core::BoardTheme;
@@ -15,6 +16,7 @@ use tangibles_chess_core::BoardTheme;
 use crate::piece_icons::piece_icon_name;
 use crate::theme::TextureLayout;
 use crate::theme::ThemePalette;
+use crate::ui::parking_strip::ParkingStrip;
 
 /// Everything the scene needs to draw one frame.
 #[derive(Debug)]
@@ -50,6 +52,10 @@ pub(crate) struct SceneState {
     pub(crate) illegal: Option<IllegalFlash>,
     /// Physical/logical discrepancy markers (`TangiblesRendered`).
     pub(crate) discrepant: Vec<Square>,
+    /// West parking strip cells (occupancy + rendered captured piece).
+    pub(crate) cap_west: ParkingStrip,
+    /// East parking strip cells, mirroring `cap_west`.
+    pub(crate) cap_east: ParkingStrip,
 }
 
 impl Default for SceneState {
@@ -70,6 +76,8 @@ impl Default for SceneState {
             ghost: None,
             illegal: None,
             discrepant: Vec::new(),
+            cap_west: ParkingStrip::default(),
+            cap_east: ParkingStrip::default(),
         }
     }
 }
@@ -195,10 +203,10 @@ mod imp {
             if state.parking_zones {
                 let parking = snapshot.append_cairo(&graphene::Rect::new((bx - cell) as f32, by as f32, (bs + 2.0 * cell) as f32, bs as f32));
                 if bx >= cell {
-                    parking_strip(&parking, bx - cell, by, cell, &palette);
+                    parking_strip(&parking, bx - cell, by, cell, &state.cap_west, &palette);
                 }
                 if bx + bs + cell <= width {
-                    parking_strip(&parking, bx + bs, by, cell, &palette);
+                    parking_strip(&parking, bx + bs, by, cell, &state.cap_east, &palette);
                 }
             }
 
@@ -305,20 +313,9 @@ mod imp {
             }
 
             // Piece layer.
-            if state.render_pieces
-                && let Some(position) = &state.position
-            {
+            if state.render_pieces {
                 let scale = self.obj().scale_factor();
-                for square in Square::ALL {
-                    let Some(piece) = position.board().piece_at(square) else {
-                        continue;
-                    };
-                    if state.lifted == Some(square) {
-                        continue; // in the player's hand
-                    }
-                    let scene = square_scene(square);
-                    let x = bx + (scene % 8) as f64 * cell;
-                    let y = by + (scene / 8) as f64 * cell;
+                let paint_piece = |piece: Piece, x: f64, y: f64| {
                     let name = piece_icon_name(piece);
                     let paintable = {
                         let mut cache = self.paintables.borrow_mut();
@@ -348,6 +345,32 @@ mod imp {
                     }
                     paintable.snapshot(snapshot, cell, cell);
                     snapshot.restore();
+                };
+                if let Some(position) = &state.position {
+                    for square in Square::ALL {
+                        let Some(piece) = position.board().piece_at(square) else {
+                            continue;
+                        };
+                        if state.lifted == Some(square) {
+                            continue; // in the player's hand
+                        }
+                        let scene = square_scene(square);
+                        let x = bx + (scene % 8) as f64 * cell;
+                        let y = by + (scene / 8) as f64 * cell;
+                        paint_piece(piece, x, y);
+                    }
+                }
+                // Parked captured pieces on the cap strips
+                // (`TangiblesRendered`): the cells sit beside the
+                // board, each the size of a board square.
+                if state.parking_zones {
+                    for (strip, strip_x) in [(state.cap_west, bx - cell), (state.cap_east, bx + bs)] {
+                        for (row, cell_state) in strip.cells().iter().enumerate() {
+                            if let Some(piece) = cell_state.piece {
+                                paint_piece(piece, strip_x, by + row as f64 * cell);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -460,10 +483,16 @@ fn square_scene(square: Square) -> usize {
 
 /// One captured-piece parking column: eight muted cells so the strip
 /// reads as a place to park pieces rather than as board squares.
-fn parking_strip(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, palette: &ThemePalette) {
-    for index in 0..8 {
+/// Occupied cells are highlighted so a parked marker is visible at a
+/// glance.
+fn parking_strip(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, strip: &ParkingStrip, palette: &ThemePalette) {
+    for (index, cell_state) in strip.cells().iter().enumerate() {
         let yy = y + index as f64 * cell;
-        cr.set_source_rgba(palette.dark.0, palette.dark.1, palette.dark.2, 0.30);
+        if cell_state.occupied {
+            cr.set_source_rgba(palette.target.0, palette.target.1, palette.target.2, 0.45);
+        } else {
+            cr.set_source_rgba(palette.dark.0, palette.dark.1, palette.dark.2, 0.30);
+        }
         cr.rectangle(x, yy, cell, cell);
         let _ = cr.fill();
         cr.set_source_rgba(palette.frame.0, palette.frame.1, palette.frame.2, 0.7);

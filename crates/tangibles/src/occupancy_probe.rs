@@ -1,9 +1,12 @@
 use std::collections::BTreeSet;
 
-use crate::BoardGeometry;
+use tangibles_chess_core::FieldIndex;
+
 use crate::FieldEvent;
 use crate::FieldEventKind;
+use crate::FieldName;
 use crate::TouchPoint;
+use crate::Zone;
 
 /// Live view of which board fields are physically occupied.
 ///
@@ -12,10 +15,10 @@ use crate::TouchPoint;
 /// reconnects.
 #[derive(Debug, Default, Clone)]
 pub struct OccupancyProbe {
-    /// Occupied board field indices (screen order).
-    occupied: BTreeSet<usize>,
-    /// Occupied zone fields (`btn-*`, `tray-*` names).
-    occupied_zones: BTreeSet<String>,
+    /// Occupied board fields (screen order).
+    occupied: BTreeSet<FieldIndex>,
+    /// Occupied zone fields (`btn-*`, `tray-*`, `cap-*`).
+    occupied_zones: BTreeSet<Zone>,
 }
 
 impl OccupancyProbe {
@@ -26,7 +29,7 @@ impl OccupancyProbe {
     /// when debouncing glitches), `Lagged` marks nothing - callers should
     /// resync via [`OccupancyProbe::refresh`].
     pub fn on_event(&mut self, event: &FieldEvent) {
-        let Some(field) = event.field.as_deref() else {
+        let Some(name) = &event.field else {
             return;
         };
         let occupied = match event.kind {
@@ -35,16 +38,22 @@ impl OccupancyProbe {
             FieldEventKind::FieldCountChanged => event.count.unwrap_or(0) > 0,
             FieldEventKind::Lagged | FieldEventKind::Other => return,
         };
-        if let Some(index) = BoardGeometry::field_index(field) {
-            if occupied {
-                self.occupied.insert(index);
-            } else {
-                self.occupied.remove(&index);
+        match name {
+            FieldName::Board(index) => {
+                if occupied {
+                    self.occupied.insert(*index);
+                } else {
+                    self.occupied.remove(index);
+                }
             }
-        } else if occupied {
-            self.occupied_zones.insert(field.to_string());
-        } else {
-            self.occupied_zones.remove(field);
+            FieldName::Zone(zone) => {
+                if occupied {
+                    self.occupied_zones.insert(*zone);
+                } else {
+                    self.occupied_zones.remove(zone);
+                }
+            }
+            FieldName::Unknown(_) => {}
         }
     }
 
@@ -52,42 +61,50 @@ impl OccupancyProbe {
     /// contacts inside each field's normalized rectangle count it
     /// occupied. `window_mm`/`board_mm` come from the same calibration
     /// that built the field set.
-    pub fn refresh(&mut self, touches: &[TouchPoint], board_mm: (f64, f64, f64)) {
+    pub fn refresh(&mut self, touches: &[TouchPoint], board_mm: impl Into<crate::BoardRectMm>) {
         self.occupied.clear();
-        let (bx, by, bs) = board_mm;
-        let cell = bs / 8.0;
+        let board = board_mm.into();
+        let cell = board.cell().as_f64();
+        let (bx, by) = (board.x.as_f64(), board.y.as_f64());
         for touch in touches {
             let col = ((touch.pos.x - bx) / cell) as i64;
             let row = ((touch.pos.y - by) / cell) as i64;
-            if (0..8).contains(&col) && (0..8).contains(&row) {
-                self.occupied.insert(row as usize * 8 + col as usize);
+            if (0..8).contains(&col)
+                && (0..8).contains(&row)
+                && let Some(index) = FieldIndex::new(row as usize * 8 + col as usize)
+            {
+                self.occupied.insert(index);
             }
         }
     }
 
-    /// All currently occupied board field indices (screen order).
-    pub fn occupied(&self) -> &BTreeSet<usize> {
+    /// All currently occupied board fields (screen order).
+    pub fn occupied(&self) -> &BTreeSet<FieldIndex> {
         &self.occupied
     }
 
     /// Whether a zone field currently holds a marker.
-    pub fn zone_occupied(&self, zone: &str) -> bool {
-        self.occupied_zones.contains(zone)
+    pub fn zone_occupied(&self, zone: Zone) -> bool {
+        self.occupied_zones.contains(&zone)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use tangibles_chess_core::FieldIndex;
+
     use super::OccupancyProbe;
     use crate::FieldEvent;
     use crate::FieldEventKind;
+    use crate::FieldName;
     use crate::TouchPoint;
+    use crate::Zone;
 
     fn event(kind: FieldEventKind, field: &str, count: Option<i32>) -> FieldEvent {
         FieldEvent {
             kind,
             field_set: Some("chess".to_string()),
-            field: Some(field.to_string()),
+            field: Some(FieldName::from(field)),
             count,
             skipped: None,
         }
@@ -98,12 +115,13 @@ mod tests {
         let mut probe = OccupancyProbe::default();
         probe.on_event(&event(FieldEventKind::FieldPlaced, "f12", None));
         probe.on_event(&event(FieldEventKind::FieldPlaced, "btn-south", None));
-        assert!(probe.occupied().contains(&12));
-        assert!(probe.zone_occupied("btn-south"));
+        let f12 = FieldIndex::new(12).expect("in range");
+        assert!(probe.occupied().contains(&f12));
+        assert!(probe.zone_occupied(Zone::BtnSouth));
         probe.on_event(&event(FieldEventKind::FieldLifted, "f12", None));
-        assert!(!probe.occupied().contains(&12));
+        assert!(!probe.occupied().contains(&f12));
         probe.on_event(&event(FieldEventKind::FieldLifted, "btn-south", None));
-        assert!(!probe.zone_occupied("btn-south"));
+        assert!(!probe.zone_occupied(Zone::BtnSouth));
     }
 
     #[test]
@@ -136,7 +154,7 @@ mod tests {
         ];
         probe.refresh(&touches, (80.0, 80.0, 640.0));
         assert_eq!(probe.occupied().len(), 2);
-        assert!(probe.occupied().contains(&0));
-        assert!(probe.occupied().contains(&63));
+        assert!(probe.occupied().contains(&FieldIndex::new(0).expect("in range")));
+        assert!(probe.occupied().contains(&FieldIndex::new(63).expect("in range")));
     }
 }

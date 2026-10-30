@@ -1,3 +1,5 @@
+use crate::FieldIndex;
+use crate::SceneIndex;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -52,6 +54,19 @@ impl BoardOrientation {
             Self::Deg270 => 270,
         }
     }
+
+    /// Maps a physical screen field to the canonical scene index it
+    /// currently holds under this orientation: the orientation's
+    /// inverse rotation applied to the field index.
+    pub fn scene_index(self, index: FieldIndex) -> SceneIndex {
+        let rotated = match self {
+            Self::Deg0 => index,
+            Self::Deg90 => index.rot_ccw(),
+            Self::Deg180 => index.rot_180(),
+            Self::Deg270 => index.rot_cw(),
+        };
+        rotated.into()
+    }
 }
 
 #[cfg(test)]
@@ -75,6 +90,32 @@ mod tests {
         for orientation in BoardOrientation::ALL {
             assert_eq!(orientation.clockwise().counter_clockwise(), orientation);
             assert_eq!(orientation.counter_clockwise().clockwise(), orientation);
+        }
+    }
+
+    #[test]
+    fn scene_index_rotates_the_grid() {
+        use crate::FieldIndex;
+        let index = |i| FieldIndex::new(i).expect("in range");
+        // Top-left corner under each orientation.
+        assert_eq!(BoardOrientation::Deg0.scene_index(index(0)).as_usize(), 0);
+        assert_eq!(BoardOrientation::Deg90.scene_index(index(0)).as_usize(), 56);
+        assert_eq!(BoardOrientation::Deg180.scene_index(index(0)).as_usize(), 63);
+        assert_eq!(BoardOrientation::Deg270.scene_index(index(0)).as_usize(), 7);
+        // A center field keeps a symmetric partner under 180°.
+        assert_eq!(BoardOrientation::Deg180.scene_index(index(27)).as_usize(), 36);
+    }
+
+    #[test]
+    fn scene_index_is_a_bijection() {
+        use crate::FieldIndex;
+        use std::collections::BTreeSet;
+        for orientation in BoardOrientation::ALL {
+            let mapped: BTreeSet<usize> = (0..64)
+                .filter_map(FieldIndex::new)
+                .map(|index| orientation.scene_index(index).as_usize())
+                .collect();
+            assert_eq!(mapped.len(), 64);
         }
     }
 }

@@ -2,6 +2,8 @@ use serde::Deserialize;
 use tangible_objects_model::EventKind;
 use tangible_objects_model::TangibleEvent;
 
+use crate::FieldName;
+
 /// Discriminator of an occupancy event from `fieldEvents`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -27,8 +29,9 @@ pub struct FieldEvent {
     pub kind: FieldEventKind,
     /// Field-set name (`chess` for ours).
     pub field_set: Option<String>,
-    /// Field name (`f0`..`f63`, `btn-*`, `tray-*`).
-    pub field: Option<String>,
+    /// The affected field (board `f*`, zone `btn-*`/`tray-*`/`cap-*`,
+    /// or an unrecognised name kept raw).
+    pub field: Option<FieldName>,
     /// Debounced contact count for `FieldCountChanged`.
     pub count: Option<i32>,
     /// Dropped-event count for `Lagged`.
@@ -62,7 +65,7 @@ impl From<&TangibleEvent> for FieldEvent {
         Self {
             kind,
             field_set: event.field_set.as_ref().map(|name| name.as_str().to_string()),
-            field: event.field.as_ref().map(|name| name.as_str().to_string()),
+            field: event.field.as_ref().map(|name| FieldName::from(name.as_str())),
             count: event.count.map(|count| count.as_u32() as i32),
             skipped: event.skipped,
         }
@@ -73,13 +76,14 @@ impl From<&TangibleEvent> for FieldEvent {
 mod tests {
     use super::FieldEvent;
     use super::FieldEventKind;
+    use crate::FieldName;
 
     #[test]
     fn decodes_field_placed() {
         let event: FieldEvent =
             serde_json::from_str(r#"{"kind":"FIELD_PLACED","fieldSet":"chess","field":"f12","count":null,"skipped":null}"#).expect("decode");
         assert_eq!(event.kind, FieldEventKind::FieldPlaced);
-        assert_eq!(event.field.as_deref(), Some("f12"));
+        assert_eq!(event.field, Some(FieldName::from("f12")));
     }
 
     #[test]

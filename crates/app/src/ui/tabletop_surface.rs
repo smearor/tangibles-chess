@@ -2,6 +2,7 @@ use gtk4::prelude::*;
 use smearor_wrot_rotation::RotationWidget;
 use smearor_wrot_rotation::SmearorRotation;
 use tangibles_chess_core::GameConfig;
+use tangibles_chess_core::Side;
 
 use crate::ui::chess_scene::ChessScene;
 use crate::ui::player_panel::PanelActions;
@@ -44,10 +45,10 @@ impl TabletopSurface {
             state.parking_zones = config.tangible_mode.uses_tangibles();
         });
 
-        let white_panel = PlayerPanel::new(shakmaty::Color::White, actions, l10n);
-        let black_panel = PlayerPanel::new(shakmaty::Color::Black, actions, l10n);
-        let white_sheet = ScoreSheet::new(shakmaty::Color::White);
-        let black_sheet = ScoreSheet::new(shakmaty::Color::Black);
+        let white_panel = PlayerPanel::new(Side::White, actions, l10n);
+        let black_panel = PlayerPanel::new(Side::Black, actions, l10n);
+        let white_sheet = ScoreSheet::new(Side::White);
+        let black_sheet = ScoreSheet::new(Side::Black);
         let white_status = Self::status_line();
         let black_status = Self::status_line();
 

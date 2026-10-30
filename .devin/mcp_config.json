@@ -2,6 +2,12 @@
   "mcpServers": {
     "tangibles-chess": {
       "url": "http://127.0.0.1:9090/mcp"
+    },
+    "smearor-tangibles-chess": {
+      "url": "http://192.168.178.81:9090/mcp"
+    },
+    "tangible-objects-rs": {
+      "url": "http://192.168.178.81:8090/mcp"
     }
   }
 }

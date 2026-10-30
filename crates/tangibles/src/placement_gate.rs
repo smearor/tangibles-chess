@@ -33,7 +33,7 @@ impl PlacementGate {
         let mut status = PlacementStatus::default();
         for square in Square::ALL {
             let wants_piece = expected.board().piece_at(square).is_some();
-            let has_marker = probe.occupied().contains(&self.geometry.square_to_field(square));
+            let has_marker = self.geometry.square_to_field(square).is_some_and(|f| probe.occupied().contains(&f));
             match (wants_piece, has_marker) {
                 (true, true) => status.correct.push(square),
                 (true, false) => status.missing.push(square),
@@ -52,10 +52,13 @@ impl PlacementGate {
 mod tests {
     use shakmaty::Chess;
 
+    use tangibles_chess_core::FieldIndex;
+
     use super::PlacementGate;
     use crate::BoardGeometry;
     use crate::FieldEvent;
     use crate::FieldEventKind;
+    use crate::FieldName;
     use crate::OccupancyProbe;
 
     fn probe_with(fields: &[usize]) -> OccupancyProbe {
@@ -64,7 +67,7 @@ mod tests {
             probe.on_event(&FieldEvent {
                 kind: FieldEventKind::FieldPlaced,
                 field_set: Some("chess".to_string()),
-                field: BoardGeometry::field_name(*index),
+                field: FieldIndex::new(*index).map(FieldName::Board),
                 count: None,
                 skipped: None,
             });

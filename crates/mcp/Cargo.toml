@@ -9,6 +9,7 @@ repository.workspace = true
 description = "MCP server for tangibles-chess: game-state introspection and move control"
 
 [dependencies]
+tangibles-chess-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 schemars.workspace = true

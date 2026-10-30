@@ -29,7 +29,7 @@ pub struct GameScreen {
     /// Overlay layer for pickers/dialogs.
     overlay: gtk4::Overlay,
     /// Current snapped orientation.
-    orientation: std::cell::Cell<BoardOrientation>,
+    orientation: Cell<BoardOrientation>,
     /// White's status line (between board and controls).
     white_line: StatusLine,
     /// Black's status line (between board and controls).

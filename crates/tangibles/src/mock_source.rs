@@ -5,7 +5,10 @@ use tangible_objects_model::FieldSet;
 
 use crate::DaemonError;
 use crate::DeviceInfo;
+use crate::FIELD_SET_NAME;
 use crate::FieldEvent;
+use crate::FieldEventKind;
+use crate::FieldName;
 use crate::TangibleSource;
 use crate::TouchPoint;
 
@@ -51,9 +54,9 @@ impl MockSource {
     /// Convenience: inject a `FieldPlaced` for a field name.
     pub fn place(&self, field: &str) {
         self.inject(FieldEvent {
-            kind: crate::FieldEventKind::FieldPlaced,
-            field_set: Some(crate::FIELD_SET_NAME.to_string()),
-            field: Some(field.to_string()),
+            kind: FieldEventKind::FieldPlaced,
+            field_set: Some(FIELD_SET_NAME.to_string()),
+            field: Some(FieldName::from(field)),
             count: None,
             skipped: None,
         });
@@ -62,9 +65,9 @@ impl MockSource {
     /// Convenience: inject a `FieldLifted` for a field name.
     pub fn lift(&self, field: &str) {
         self.inject(FieldEvent {
-            kind: crate::FieldEventKind::FieldLifted,
-            field_set: Some(crate::FIELD_SET_NAME.to_string()),
-            field: Some(field.to_string()),
+            kind: FieldEventKind::FieldLifted,
+            field_set: Some(FIELD_SET_NAME.to_string()),
+            field: Some(FieldName::from(field)),
             count: None,
             skipped: None,
         });
@@ -101,6 +104,7 @@ impl TangibleSource for MockSource {
 mod tests {
     use super::MockSource;
     use crate::FieldEventKind;
+    use crate::FieldName;
     use crate::TangibleSource;
 
     #[test]
@@ -110,6 +114,6 @@ mod tests {
         let receiver = source.events();
         let event = receiver.try_recv().expect("event");
         assert_eq!(event.kind, FieldEventKind::FieldPlaced);
-        assert_eq!(event.field.as_deref(), Some("f12"));
+        assert_eq!(event.field, Some(FieldName::from("f12")));
     }
 }

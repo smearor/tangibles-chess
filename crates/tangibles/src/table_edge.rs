@@ -25,4 +25,12 @@ impl TableEdge {
             Self::West => Self::East,
         }
     }
+
+    /// The `btn-*` confirm zone for the player at this edge.
+    pub fn confirm_zone(self) -> crate::Zone {
+        match self {
+            Self::South | Self::East => crate::Zone::BtnSouth,
+            Self::North | Self::West => crate::Zone::BtnNorth,
+        }
+    }
 }

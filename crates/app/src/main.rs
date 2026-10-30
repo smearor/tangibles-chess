@@ -11,6 +11,7 @@ use std::rc::Rc;
 
 use gtk4::prelude::*;
 use libadwaita as adw;
+use tracing::warn;
 use tracing_subscriber::EnvFilter;
 use unic_langid::LanguageIdentifier;
 
@@ -60,17 +61,17 @@ fn main() -> glib::ExitCode {
 
     application.connect_activate(move |app| {
         if let Err(err) = tangibles_chess_icons::TangiblesChessIcons::install() {
-            tracing::warn!("icon set install failed: {err}");
+            warn!("icon set install failed: {err}");
         }
         if let Err(err) = fonts_rs_cuernavaca::Cuernavaca::install() {
-            tracing::warn!("cuernavaca install failed: {err}");
+            warn!("cuernavaca install failed: {err}");
         }
         if let Some(display) = gdk4::Display::default() {
             if let Err(err) = tangibles_chess_icons::TangiblesChessIcons::install_icon_theme(&display) {
-                tracing::warn!("icon theme registration failed: {err}");
+                warn!("icon theme registration failed: {err}");
             }
             if let Err(err) = fonts_rs_cuernavaca::Cuernavaca::install_icon_theme(&display) {
-                tracing::warn!("cuernavaca icon theme failed: {err}");
+                warn!("cuernavaca icon theme failed: {err}");
             }
         }
         install_css();
@@ -101,7 +102,7 @@ fn install_shutdown_handlers(app: &adw::Application) {
         let mut signals = match signal_hook::iterator::Signals::new([signal_hook::consts::SIGINT, signal_hook::consts::SIGTERM]) {
             Ok(signals) => signals,
             Err(err) => {
-                tracing::warn!("signal handler install failed: {err}");
+                warn!("signal handler install failed: {err}");
                 return;
             }
         };
@@ -112,7 +113,7 @@ fn install_shutdown_handlers(app: &adw::Application) {
     let app = app.clone();
     glib::MainContext::default().spawn_local(async move {
         if rx.recv().await.is_ok() {
-            crate::controller::with_controller(|controller| {
+            controller::with_controller(|controller| {
                 controller.borrow_mut().release_registrations();
             });
             app.quit();

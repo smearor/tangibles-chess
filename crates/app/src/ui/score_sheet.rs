@@ -3,6 +3,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk4::prelude::*;
+use tangibles_chess_core::San;
+use tangibles_chess_core::Side;
+use tracing::debug;
 
 /// Paper-scoresheet styled move list along a board edge.
 ///
@@ -15,7 +18,7 @@ pub struct ScoreSheet {
     rows: gtk4::ListBox,
     /// The rendered SAN history (kept for re-rendering on highlight
     /// changes).
-    sans: RefCell<Vec<String>>,
+    sans: RefCell<Vec<San>>,
     /// Highlighted ply index (0-based into the SAN list, replay
     /// cursor).
     active_ply: Cell<Option<usize>>,
@@ -35,16 +38,13 @@ impl ScoreSheet {
     /// The height is fixed at `min_content_height`: without natural-height
     /// propagation the sheet scrolls internally instead of growing the edge
     /// row (and shrinking the board) as the move list gets longer.
-    pub fn new(color: shakmaty::Color) -> Self {
+    pub fn new(side: Side) -> Self {
         let rows = gtk4::ListBox::new();
         rows.add_css_class("score-sheet");
         rows.set_selection_mode(gtk4::SelectionMode::None);
         let widget = gtk4::ScrolledWindow::new();
         widget.add_css_class("score-sheet-frame");
-        widget.add_css_class(match color {
-            shakmaty::Color::White => "panel-white",
-            shakmaty::Color::Black => "panel-black",
-        });
+        widget.add_css_class(side.css_class());
         widget.set_child(Some(&rows));
         widget.set_propagate_natural_height(false);
         widget.set_min_content_height(120);
@@ -66,7 +66,7 @@ impl ScoreSheet {
     }
 
     /// Rebuilds the rows from the SAN history.
-    pub fn set_moves(&self, sans: &[String]) {
+    pub fn set_moves(&self, sans: &[San]) {
         self.sans.replace(sans.to_vec());
         self.render();
     }
@@ -152,15 +152,15 @@ impl ScoreSheet {
             let value = adjustment.value();
             if row_center < value || row_center > value + page {
                 let scroll_to = (row_center - page / 2.0).clamp(0.0, scrollable);
-                tracing::debug!("score sheet scrolls to row {index} (value {value} -> {scroll_to})");
+                debug!("score sheet scrolls to row {index} (value {value} -> {scroll_to})");
                 adjustment.set_value(scroll_to);
             }
-            gtk4::glib::ControlFlow::Break
+            glib::ControlFlow::Break
         });
     }
 
     /// The ply's SAN, bold when it is the highlighted one.
-    fn ply_markup(san: &str, active: bool) -> String {
+    fn ply_markup(san: &San, active: bool) -> String {
         if active { format!("<b>{san}</b>") } else { san.to_string() }
     }
 }

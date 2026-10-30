@@ -6,6 +6,9 @@ use shakmaty::uci::UciMove;
 
 use crate::GameConfig;
 use crate::GameError;
+use crate::San;
+use crate::Side;
+use crate::Uci;
 
 /// Persistent snapshot of a game for autosave/resume.
 ///
@@ -17,11 +20,11 @@ pub struct SavedGame {
     /// The configuration the game was started with.
     pub config: GameConfig,
     /// Played moves in UCI notation, in order.
-    pub moves: Vec<String>,
+    pub moves: Vec<Uci>,
     /// SAN history for display (recomputed on load as a check is cheap).
-    pub sans: Vec<String>,
+    pub sans: Vec<San>,
     /// Resigned side, if the game ended by resignation.
-    pub resigned: Option<String>,
+    pub resigned: Option<Side>,
     /// Whether a draw was agreed.
     pub agreed_draw: bool,
 }
@@ -46,8 +49,7 @@ impl SavedGame {
         let mut position = Chess::default();
         positions.push(position.clone());
         for (index, uci) in self.moves.iter().enumerate() {
-            let mv = uci
-                .parse::<UciMove>()
+            let mv = UciMove::try_from(uci)
                 .map_err(|e| GameError::CorruptSave {
                     index,
                     uci: uci.clone(),
@@ -74,13 +76,15 @@ impl SavedGame {
 mod tests {
     use super::SavedGame;
     use crate::GameConfig;
+    use crate::San;
+    use crate::Uci;
 
     #[test]
     fn toml_roundtrip() {
         let saved = SavedGame {
             config: GameConfig::default(),
-            moves: vec!["e2e4".to_string(), "e7e5".to_string()],
-            sans: vec!["e4".to_string(), "e5".to_string()],
+            moves: vec![Uci::from("e2e4"), Uci::from("e7e5")],
+            sans: vec![San::from("e4"), San::from("e5")],
             resigned: None,
             agreed_draw: false,
         };
@@ -92,7 +96,7 @@ mod tests {
     fn replay_rebuilds_positions() {
         let saved = SavedGame {
             config: GameConfig::default(),
-            moves: vec!["e2e4".to_string(), "e7e5".to_string(), "g1f3".to_string()],
+            moves: vec![Uci::from("e2e4"), Uci::from("e7e5"), Uci::from("g1f3")],
             sans: vec![],
             resigned: None,
             agreed_draw: false,
@@ -105,7 +109,7 @@ mod tests {
     fn replay_rejects_illegal_move() {
         let saved = SavedGame {
             config: GameConfig::default(),
-            moves: vec!["e2e5".to_string()],
+            moves: vec![Uci::from("e2e5")],
             sans: vec![],
             resigned: None,
             agreed_draw: false,

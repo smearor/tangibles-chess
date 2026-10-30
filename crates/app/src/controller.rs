@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use fluent::FluentArgs;
 use gdk4::prelude::DisplayExt;
 use gdk4::prelude::MonitorExt;
 use gdk4::prelude::PaintableExt;
@@ -15,7 +16,9 @@ use gtk4::prelude::WidgetExt;
 use libadwaita as adw;
 use shakmaty::Color;
 use shakmaty::KnownOutcome;
+use shakmaty::Piece;
 use shakmaty::Position;
+use shakmaty::Role;
 use shakmaty::Square;
 use tangibles_chess_core::DrawReason;
 use tangibles_chess_core::GameConfig;
@@ -23,21 +26,29 @@ use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::GameSession;
 use tangibles_chess_core::MoveOutcome;
 use tangibles_chess_core::MoveRequest;
+use tangibles_chess_core::Side;
 use tangibles_chess_core::TangibleMode;
+use tangibles_chess_core::Uci;
 use tangibles_chess_icons::icon_names;
 use tangibles_chess_tangibles::BoardGeometry;
+use tangibles_chess_tangibles::BoardRectMm;
+use tangibles_chess_tangibles::CapSide;
 use tangibles_chess_tangibles::FieldEvent;
 use tangibles_chess_tangibles::FieldEventKind;
+use tangibles_chess_tangibles::FieldName;
 use tangibles_chess_tangibles::FieldSetBuilder;
 use tangibles_chess_tangibles::GraphQlSource;
 use tangibles_chess_tangibles::InferenceOutput;
+use tangibles_chess_tangibles::Millimeters;
 use tangibles_chess_tangibles::MockSource;
 use tangibles_chess_tangibles::MoveInference;
 use tangibles_chess_tangibles::OccupancyProbe;
 use tangibles_chess_tangibles::PlacementGate;
 use tangibles_chess_tangibles::PlacementStatus;
+use tangibles_chess_tangibles::SurfaceMm;
 use tangibles_chess_tangibles::TableEdge;
 use tangibles_chess_tangibles::TangibleSource;
+use tangibles_chess_tangibles::TouchPoint;
 use tangibles_chess_tangibles::ZoneAction;
 use tracing::debug;
 use tracing::info;
@@ -51,7 +62,17 @@ use crate::ui::chess_scene::FlashRole;
 use crate::ui::chess_scene::IllegalFlash;
 use crate::ui::game_result::GameResult;
 use crate::ui::game_screen::GameScreen;
+use crate::ui::parking_strip::ParkingStrip;
 use crate::ui::promotion_picker::PromotionPicker;
+use tangibles_chess_mcp::DrawReply;
+use tangibles_chess_mcp::ErrorReply;
+use tangibles_chess_mcp::GameStateReply;
+use tangibles_chess_mcp::LegalMovesReply;
+use tangibles_chess_mcp::MakeMoveReply;
+use tangibles_chess_mcp::PlacementReply;
+use tangibles_chess_mcp::ResignReply;
+use tangibles_chess_mcp::ScreenshotReply;
+use tangibles_chess_mcp::UndoReply;
 
 /// Which tangible backend is active.
 enum Source {
@@ -95,14 +116,21 @@ pub struct GameController {
     /// Last applied move's squares for the highlight trace.
     last_move: Option<(Square, Square)>,
     /// Board rectangle in screen mm for the registered field set.
-    board_mm: (f64, f64, f64),
+    board_mm: BoardRectMm,
+    /// Surface size in screen mm (bounds for the parking strips).
+    window_mm: SurfaceMm,
+    /// West parking strip beside the board (`cap-west-*` fields) -
+    /// occupancy plus rendered captured pieces.
+    parked_west: ParkingStrip,
+    /// East parking strip, mirroring `parked_west`.
+    parked_east: ParkingStrip,
     /// Whether the game-over overlay was already shown.
     result_shown: bool,
     /// Generation counter for the illegal-move flash.
     illegal_seq: u64,
     /// Last rejected tangible move (`from`, `to`): the physical marker
     /// is misplaced; a lift+place back onto `from` is accepted quietly.
-    rejected_move: Option<(Square, Square)>,
+    rejected_move: Option<MoveRequest>,
     /// Ply cursor while replaying a finished game (`None` = live).
     replay_index: Option<usize>,
     /// The game-over overlay widget, kept for removal when entering
@@ -168,7 +196,10 @@ impl GameController {
             pending_promotion: None,
             promotion_widget: RefCell::new(None),
             last_move: None,
-            board_mm: (0.0, 0.0, 0.0),
+            board_mm: BoardRectMm::default(),
+            window_mm: SurfaceMm::default(),
+            parked_west: ParkingStrip::default(),
+            parked_east: ParkingStrip::default(),
             result_shown: false,
             illegal_seq: 0,
             rejected_move: None,
@@ -204,7 +235,7 @@ impl GameController {
                     Square::ALL
                         .iter()
                         .filter(|square| position.board().piece_at(**square).is_some())
-                        .filter_map(|square| BoardGeometry::field_name(geometry.square_to_field(*square)))
+                        .filter_map(|square| geometry.square_to_field(*square).map(|index| index.to_string()))
                         .collect::<Vec<_>>()
                         .into_iter(),
                 ));
@@ -331,7 +362,9 @@ impl GameController {
         tangibles_chess_mcp::spawn_http(tx, addr, watch_rx);
         glib::MainContext::default().spawn_local(async move {
             while let Ok(request) = rx.recv().await {
-                let mut reply = serde_json::json!({ "error": "no active game" });
+                let mut reply = tangibles_chess_mcp::to_value(&ErrorReply {
+                    error: "no active game".to_string(),
+                });
                 with_controller(|controller| {
                     reply = controller.borrow_mut().handle_mcp(&request.command);
                 });
@@ -346,19 +379,22 @@ impl GameController {
     fn handle_mcp(&mut self, command: &tangibles_chess_mcp::CommandKind) -> serde_json::Value {
         use tangibles_chess_mcp::CommandKind;
         match command {
-            CommandKind::GameState => self.mcp_game_state(),
+            CommandKind::GameState => tangibles_chess_mcp::to_value(&self.mcp_game_state()),
             CommandKind::LegalMoves { square } => {
                 let position = self.session.position();
-                let moves: Vec<String> = position
+                let moves: Vec<Uci> = position
                     .legal_moves()
                     .iter()
                     .filter(|mv| match square.as_deref() {
                         Some(name) => name.parse::<Square>().ok() == mv.from(),
                         None => true,
                     })
-                    .map(|mv| mv.to_uci(shakmaty::CastlingMode::Standard).to_string())
+                    .map(Uci::from_move)
                     .collect();
-                serde_json::json!({ "legal_moves": moves, "turn": self.session.turn().to_string() })
+                tangibles_chess_mcp::to_value(&LegalMovesReply {
+                    legal_moves: moves,
+                    turn: Side::from(self.session.turn()),
+                })
             }
             CommandKind::MakeMove { uci } => {
                 let parsed = match uci.parse::<shakmaty::uci::UciMove>() {
@@ -366,7 +402,9 @@ impl GameController {
                     Err(_) => None,
                 };
                 let Some(mv) = parsed else {
-                    return serde_json::json!({ "error": format!("invalid move '{uci}'") });
+                    return tangibles_chess_mcp::to_value(&ErrorReply {
+                        error: format!("invalid move '{uci}'"),
+                    });
                 };
                 let request = MoveRequest {
                     from: mv.from().unwrap_or_else(|| mv.to()),
@@ -374,60 +412,65 @@ impl GameController {
                     promotion: mv.promotion(),
                 };
                 match self.apply_request(request) {
-                    MoveOutcome::Applied { san } => {
-                        serde_json::json!({ "applied": san, "fen": self.session.fen() })
-                    }
-                    MoveOutcome::NeedsPromotion { to } => serde_json::json!({
-                        "needs_promotion": to.to_string(),
-                        "hint": "append a role letter, e.g. 'e7e8q'",
+                    MoveOutcome::Applied(san) => tangibles_chess_mcp::to_value(&MakeMoveReply::Applied {
+                        applied: san,
+                        fen: self.session.fen(),
                     }),
-                    MoveOutcome::Illegal { reason } => serde_json::json!({ "illegal": reason }),
+                    MoveOutcome::NeedsPromotion { to } => tangibles_chess_mcp::to_value(&MakeMoveReply::NeedsPromotion {
+                        needs_promotion: to.to_string(),
+                        hint: "append a role letter, e.g. 'e7e8q'".to_string(),
+                    }),
+                    MoveOutcome::Illegal(reason) => tangibles_chess_mcp::to_value(&MakeMoveReply::Illegal { illegal: reason.to_string() }),
                 }
             }
             CommandKind::Undo => match self.session.undo() {
                 Some(plan) => {
-                    let steps: Vec<String> = plan
-                        .steps
-                        .iter()
-                        .map(|step| match step {
-                            tangibles_chess_core::UndoStep::MoveBack { from, to } => {
-                                format!("move {to} back to {from}")
-                            }
-                            tangibles_chess_core::UndoStep::Restore { square, piece } => {
-                                format!("restore {piece:?} on {square}")
-                            }
-                        })
-                        .collect();
+                    let steps: Vec<String> = plan.steps.iter().map(|step| step.to_string()).collect();
                     self.sync_scene();
-                    serde_json::json!({ "undone": true, "steps": steps, "fen": self.session.fen() })
+                    tangibles_chess_mcp::to_value(&UndoReply::Done {
+                        undone: true,
+                        steps,
+                        fen: self.session.fen(),
+                    })
                 }
-                None => serde_json::json!({ "undone": false, "reason": "nothing to undo" }),
+                None => tangibles_chess_mcp::to_value(&UndoReply::Empty {
+                    undone: false,
+                    reason: "nothing to undo".to_string(),
+                }),
             },
-            CommandKind::Resign { color } => {
-                let color = match color.as_str() {
-                    "black" => Color::Black,
-                    _ => Color::White,
-                };
-                self.session.resign(color);
-                self.session.finish_if_terminal();
-                self.sync_scene();
-                serde_json::json!({ "resigned": color.to_string(), "outcome": self.session.outcome().map(|o| format!("{o:?}")) })
-            }
+            CommandKind::Resign { color } => match color.parse::<Side>() {
+                Err(_) => tangibles_chess_mcp::to_value(&ResignReply::Declined {
+                    resigned: false,
+                    reason: "color must be 'white' or 'black'".to_string(),
+                }),
+                Ok(side) => {
+                    self.session.resign(side);
+                    self.session.finish_if_terminal();
+                    self.sync_scene();
+                    tangibles_chess_mcp::to_value(&ResignReply::Resigned {
+                        resigned: side,
+                        outcome: self.session.outcome().map(|o| format!("{o:?}")),
+                    })
+                }
+            },
             CommandKind::AgreeDraw => {
                 self.session.agree_draw();
                 self.session.finish_if_terminal();
                 self.sync_scene();
-                serde_json::json!({ "draw_agreed": true, "outcome": self.session.outcome().map(|o| format!("{o:?}")) })
+                tangibles_chess_mcp::to_value(&DrawReply {
+                    draw_agreed: true,
+                    outcome: self.session.outcome().map(|o| format!("{o:?}")),
+                })
             }
             CommandKind::Screenshot => self.mcp_screenshot(),
             CommandKind::PlacementStatus => {
                 let status = self.gate.check(self.session.position(), &self.probe);
-                serde_json::json!({
-                    "placed": status.placed(),
-                    "total": status.total,
-                    "missing": status.missing.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
-                    "unexpected": status.unexpected.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
-                    "consistent": status.is_consistent(),
+                tangibles_chess_mcp::to_value(&PlacementReply {
+                    placed: status.placed(),
+                    total: status.total,
+                    missing: status.missing.iter().map(|s| s.to_string()).collect(),
+                    unexpected: status.unexpected.iter().map(|s| s.to_string()).collect(),
+                    consistent: status.is_consistent(),
                 })
             }
         }
@@ -436,13 +479,15 @@ impl GameController {
     /// PNG screenshot of the window for the MCP `screenshot` tool.
     fn mcp_screenshot(&self) -> serde_json::Value {
         let Some(texture) = self.screenshot_texture() else {
-            return serde_json::json!({ "error": "window is not realized" });
+            return tangibles_chess_mcp::to_value(&ErrorReply {
+                error: "window is not realized".to_string(),
+            });
         };
         let bytes = texture.save_to_png_bytes();
-        serde_json::json!({
-            "png_base64": gtk4::glib::base64_encode(bytes.as_ref()).as_str(),
-            "width": texture.width(),
-            "height": texture.height(),
+        tangibles_chess_mcp::to_value(&ScreenshotReply {
+            png_base64: gtk4::glib::base64_encode(bytes.as_ref()).to_string(),
+            width: texture.width(),
+            height: texture.height(),
         })
     }
 
@@ -483,7 +528,7 @@ impl GameController {
             .unwrap_or(0);
         let path = dir.join(format!("screenshot-{stamp}.png"));
         if std::fs::write(&path, texture.save_to_png_bytes().as_ref()).is_ok() {
-            tracing::info!("screenshot saved to {}", path.display());
+            info!("screenshot saved to {}", path.display());
             self.screen.show_message(&self.l10n.msg("game-screenshot-saved"));
         }
     }
@@ -493,23 +538,24 @@ impl GameController {
     fn notify_mcp_state(&self) {
         MCP_STATE_WATCH.with(|slot| {
             if let Some(tx) = slot.borrow().as_ref() {
-                let _ = tx.send(self.mcp_game_state());
+                let _ = tx.send(tangibles_chess_mcp::to_value(&self.mcp_game_state()));
             }
         });
     }
 
     /// Game-state snapshot for the MCP `game_state` tool.
-    fn mcp_game_state(&self) -> serde_json::Value {
+    fn mcp_game_state(&self) -> GameStateReply {
         let config = self.session.config();
-        serde_json::json!({
-            "phase": format!("{:?}", self.session.phase()),
-            "turn": self.session.turn().to_string(),
-            "fen": self.session.fen(),
-            "san_history": self.session.san_history(),
-            "outcome": self.session.outcome().map(|o| format!("{o:?}")),
-            "tangible_mode": format!("{:?}", config.tangible_mode),
-            "claimable_draws": self.session.claimable_draws().iter().map(|d| format!("{d:?}")).collect::<Vec<_>>(),
-        })
+        GameStateReply {
+            phase: self.session.phase(),
+            turn: Side::from(self.session.turn()),
+            fen: self.session.fen(),
+            san_history: self.session.san_history().to_vec(),
+            uci_history: self.session.uci_history().to_vec(),
+            outcome: self.session.outcome().map(|o| format!("{o:?}")),
+            tangible_mode: config.tangible_mode,
+            claimable_draws: self.session.claimable_draws(),
+        }
     }
 
     /// Drains the field-event channel into the controller on the main
@@ -548,16 +594,17 @@ impl GameController {
              widget={}x{}, scene_board={scene_rect:?}",
             widget_size.0, widget_size.1, mm_per_px
         );
+        self.window_mm = SurfaceMm::from((screen_w_mm, screen_h_mm));
         if let Some((bx, by, bs)) = self.screen.surface.scene.board_rect_mm(mm_per_px) {
-            self.board_mm = (bx, by, bs);
+            self.board_mm = BoardRectMm::from((bx, by, bs));
         } else {
             // Scene not realized yet: approximate with a centered square.
             let side = panel_w.min(panel_h) * 0.88 * mm_per_px;
-            self.board_mm = ((screen_w_mm - side) / 2.0, (screen_h_mm - side) / 2.0, side);
+            self.board_mm = BoardRectMm::from(((screen_w_mm - side) / 2.0, (screen_h_mm - side) / 2.0, side));
         }
         info!(
             "field set board_mm: ({:.1}, {:.1}, {:.1}) on {:.1}x{:.1}mm surface",
-            self.board_mm.0, self.board_mm.1, self.board_mm.2, screen_w_mm, screen_h_mm
+            self.board_mm.x, self.board_mm.y, self.board_mm.side, screen_w_mm, screen_h_mm
         );
         FieldSetBuilder::new(self.board_mm, (screen_w_mm, screen_h_mm)).build()
     }
@@ -638,10 +685,9 @@ impl GameController {
         // Visual feedback: the lifted square glows while a piece is in
         // the air ("light under the figure").
         if event.kind == FieldEventKind::FieldLifted
-            && let Some(name) = &event.field
-            && let Some(index) = BoardGeometry::field_index(name)
-            && let Some(square) = self.geometry.field_to_square(index)
+            && let Some(FieldName::Board(index)) = event.field.as_ref()
         {
+            let square = self.geometry.field_to_square(*index);
             let own = self.session.position().board().piece_at(square);
             let lifted = own.filter(|p| p.color == self.session.turn()).map(|_| square);
             self.screen.surface.scene.update(|state| {
@@ -654,17 +700,16 @@ impl GameController {
         // Graceful return after a rejected intent: lifting the misplaced
         // marker and placing it back on its origin restores the board
         // quietly instead of producing lift/place anomalies.
-        if let Some((from, to)) = self.rejected_move
-            && let Some(name) = event.field.as_deref()
-            && let Some(index) = BoardGeometry::field_index(name)
-            && let Some(square) = self.geometry.field_to_square(index)
+        if let Some(rejected) = self.rejected_move
+            && let Some(FieldName::Board(index)) = event.field.as_ref()
         {
+            let square = self.geometry.field_to_square(*index);
             match event.kind {
-                FieldEventKind::FieldLifted if square == to => return,
-                FieldEventKind::FieldPlaced if square == from || square == to => {
+                FieldEventKind::FieldLifted if square == rejected.to => return,
+                FieldEventKind::FieldPlaced if square == rejected.from || square == rejected.to => {
                     // Back on its origin resolves the rejection; dropped
                     // on the same wrong square keeps it pending.
-                    self.rejected_move = (square == to).then_some((from, to));
+                    self.rejected_move = (square == rejected.to).then_some(rejected);
                     return;
                 }
                 FieldEventKind::FieldPlaced => self.rejected_move = None,
@@ -674,9 +719,9 @@ impl GameController {
         let position = self.session.position().clone();
         for output in self.inference.on_event(&event, &position) {
             match output {
-                InferenceOutput::MoveIntent { from, to } => {
+                InferenceOutput::MoveIntent(request) => {
                     self.screen.surface.scene.update(|s| s.lifted = None);
-                    self.apply_request(MoveRequest::new(from, to));
+                    self.apply_request(request);
                 }
                 InferenceOutput::Cancelled => {
                     self.screen.surface.scene.update(|s| {
@@ -688,8 +733,15 @@ impl GameController {
                 InferenceOutput::Zone(ZoneAction::TrayCount { edge, count }) => {
                     self.update_tray(edge, count);
                 }
-                InferenceOutput::Anomaly { detail } => {
-                    warn!("board anomaly: {detail}");
+                InferenceOutput::Zone(ZoneAction::CapCell { side, row, occupied }) => {
+                    match side {
+                        CapSide::West => self.parked_west.set_occupied(row as usize, occupied),
+                        CapSide::East => self.parked_east.set_occupied(row as usize, occupied),
+                    }
+                    self.sync_scene();
+                }
+                InferenceOutput::Anomaly(reason) => {
+                    warn!("board anomaly: {reason}");
                     self.screen.show_message_for(self.session.turn(), &self.l10n.msg("anomaly-detail"));
                 }
                 InferenceOutput::Lagged => self.resync_occupancy(),
@@ -709,7 +761,7 @@ impl GameController {
                 .into_iter()
                 .filter(|square| {
                     let logical = self.session.position().board().piece_at(*square).is_some();
-                    let physical = self.probe.occupied().contains(&self.geometry.square_to_field(*square));
+                    let physical = self.geometry.square_to_field(*square).is_some_and(|f| self.probe.occupied().contains(&f));
                     logical != physical
                 })
                 .collect()
@@ -749,8 +801,37 @@ impl GameController {
             _ => return,
         };
         self.probe.refresh(&touches, self.board_mm);
+        self.resync_parked(&touches);
         if self.session.phase() == GamePhase::AwaitingPlacement {
             self.update_placement();
+        }
+    }
+
+    /// Rebuilds parking-cell occupancy from raw touches after a lagged
+    /// subscription - the probe only maps board fields, so the cap
+    /// strips get their own point-in-rect pass with the same bounds
+    /// the field-set builder registers.
+    fn resync_parked(&mut self, touches: &[TouchPoint]) {
+        self.parked_west.clear();
+        self.parked_east.clear();
+        let board = self.board_mm;
+        let cell = board.cell();
+        if cell <= Millimeters::default() {
+            return;
+        }
+        for touch in touches {
+            let row = (touch.pos.y - board.y.as_f64()) / cell.as_f64();
+            if !(0.0..8.0).contains(&row) {
+                continue;
+            }
+            let row = row as usize;
+            let px = Millimeters::new(touch.pos.x);
+            if board.x >= cell && px >= board.x - cell && px < board.x {
+                self.parked_west.set_occupied(row, true);
+            }
+            if board.x_max() + cell <= self.window_mm.width && px >= board.x_max() && px < board.x_max() + cell {
+                self.parked_east.set_occupied(row, true);
+            }
         }
     }
 
@@ -817,18 +898,30 @@ impl GameController {
     /// Validates and applies a move request, dispatching the outcome to
     /// the UI. Returns the session's outcome for remote callers.
     pub fn apply_request(&mut self, request: MoveRequest) -> MoveOutcome {
+        let mover = self.session.turn();
+        let victim = self.session.position().board().piece_at(request.to).or_else(|| {
+            // En passant: the taken pawn is not on the target square.
+            let moving = self.session.position().board().piece_at(request.from)?;
+            (moving.role == Role::Pawn && request.from.file() != request.to.file()).then_some(Piece {
+                color: mover.other(),
+                role: Role::Pawn,
+            })
+        });
         let outcome = self.session.request_move(request);
         match &outcome {
-            MoveOutcome::Applied { san } => {
+            MoveOutcome::Applied(san) => {
                 debug!("move applied: {san}");
                 self.selected = None;
                 self.last_move = Some((request.from, request.to));
                 if self.session.position().is_check() {
                     self.sound.play("check");
-                } else if san.contains('x') {
+                } else if san.as_str().contains('x') {
                     self.sound.play("capture");
                 } else {
                     self.sound.play("move");
+                }
+                if let Some(victim) = victim.filter(|_| san.as_str().contains('x')) {
+                    self.screen.show_message(&self.capture_notice(mover, victim, request.to));
                 }
                 self.sync_scene();
                 self.autosave();
@@ -840,14 +933,36 @@ impl GameController {
                 self.pending_promotion = Some(request);
                 self.show_promotion_picker(*to);
             }
-            MoveOutcome::Illegal { reason } => {
+            MoveOutcome::Illegal(reason) => {
                 warn!("illegal move rejected: {reason}");
-                self.rejected_move = Some((request.from, request.to));
-                self.screen.show_message_for(self.session.turn(), reason);
+                self.rejected_move = Some(request);
+                self.screen.show_message_for(self.session.turn(), &self.l10n.msg(reason.l10n_key()));
                 self.flash_illegal(request);
             }
         }
         outcome
+    }
+
+    /// Status-line notice for a capture, shown on both sides:
+    /// "{color} captures {piece} on {square}".
+    fn capture_notice(&self, mover: Color, victim: Piece, square: Square) -> String {
+        let color_key = match mover {
+            Color::White => "color-white",
+            Color::Black => "color-black",
+        };
+        let piece_key = match victim.role {
+            Role::Pawn => "piece-pawn",
+            Role::Knight => "piece-knight",
+            Role::Bishop => "piece-bishop",
+            Role::Rook => "piece-rook",
+            Role::Queen => "piece-queen",
+            Role::King => "piece-king",
+        };
+        let mut args = FluentArgs::new();
+        args.set("color", self.l10n.msg(color_key).to_string());
+        args.set("piece", self.l10n.msg(piece_key).to_string());
+        args.set("square", square.to_string());
+        self.l10n.msg_args("capture-notice", &args).to_string()
     }
 
     /// Briefly flashes the rejected move's target square red - plus,
@@ -1013,6 +1128,11 @@ impl GameController {
         self.rotate(true);
     }
 
+    /// Rotates the board one quarter turn counter-clockwise.
+    pub fn rotate_ccw(&mut self) {
+        self.rotate(false);
+    }
+
     /// Applies a rotation step, updating the field mapping. Locked while
     /// a tangible game is in progress (resting markers would remap).
     fn rotate(&mut self, clockwise: bool) {
@@ -1032,12 +1152,12 @@ impl GameController {
         self.gate = PlacementGate::new(self.geometry);
     }
 
-    /// Resign for `color`.
-    pub fn resign(&mut self, color: Color) {
+    /// Resign for `side`.
+    pub fn resign(&mut self, side: Side) {
         if self.replay_index.is_some() {
             return;
         }
-        self.session.resign(color);
+        self.session.resign(side);
         self.sync_scene();
         self.show_result();
     }
@@ -1065,12 +1185,22 @@ impl GameController {
         let last_move = (self.replay_index.is_none() && self.session.san_history().len().gt(&0))
             .then(|| self.last_move_squares())
             .flatten();
+        // Captured pieces park in canonical order: the n-th occupied
+        // parking cell (west first, then east) renders the n-th
+        // captured piece.
+        let mut captured = self.session.captured_pieces().into_iter();
+        self.parked_west.assign_pieces(&mut captured);
+        self.parked_east.assign_pieces(&mut captured);
+        let cap_west = self.parked_west;
+        let cap_east = self.parked_east;
         self.screen.surface.scene.update(|state| {
             state.position = Some(position.clone());
             state.check = check.flatten();
             state.last_move = last_move;
             state.selected = self.selected;
             state.legal_targets = self.selected.map(|s| self.session.legal_targets(s)).unwrap_or_default();
+            state.cap_west = cap_west;
+            state.cap_east = cap_east;
         });
         let sans = self.session.san_history();
         self.screen.surface.white_sheet.set_moves(sans);

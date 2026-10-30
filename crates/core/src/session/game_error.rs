@@ -1,3 +1,5 @@
+use crate::GamePhase;
+use crate::Uci;
 use thiserror::Error;
 
 /// Errors of the game domain layer.
@@ -15,13 +17,13 @@ pub enum GameError {
         /// Index of the offending move in the saved move list.
         index: usize,
         /// The UCI move string that failed.
-        uci: String,
+        uci: Uci,
         /// Underlying error message.
         reason: String,
     },
     /// A requested action is not valid in the current phase.
     #[error("action not allowed in phase {0:?}")]
-    WrongPhase(crate::GamePhase),
+    WrongPhase(GamePhase),
     /// I/O error while reading or writing the autosave file.
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),

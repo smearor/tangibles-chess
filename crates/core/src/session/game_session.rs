@@ -1,25 +1,27 @@
-use shakmaty::CastlingMode;
 use shakmaty::Chess;
 use shakmaty::Color;
 use shakmaty::EnPassantMode;
-use shakmaty::File;
 use shakmaty::KnownOutcome;
 use shakmaty::Move;
+use shakmaty::Piece;
 use shakmaty::Position;
 use shakmaty::Role;
 use shakmaty::Square;
-use shakmaty::fen::Fen;
-use shakmaty::san::SanPlus;
 use shakmaty::zobrist::Zobrist64;
 
 use crate::CheckProjection;
 use crate::DrawReason;
+use crate::Fen;
 use crate::GameConfig;
 use crate::GameError;
 use crate::GamePhase;
+use crate::IllegalReason;
 use crate::MoveOutcome;
 use crate::MoveRequest;
+use crate::San;
 use crate::SavedGame;
+use crate::Side;
+use crate::Uci;
 use crate::UndoPlan;
 
 /// A running or configured chess game.
@@ -39,15 +41,15 @@ pub struct GameSession {
     past: Vec<Chess>,
     /// Undone moves available for redo, latest last: the undone
     /// position, its zobrist hash and its SAN/UCI strings.
-    future: Vec<(Chess, Zobrist64, String, String)>,
+    future: Vec<(Chess, Zobrist64, San, Uci)>,
     /// Position hashes incl. initial and current (repetition detection).
     hashes: Vec<Zobrist64>,
     /// SAN strings of played moves.
-    sans: Vec<String>,
+    sans: Vec<San>,
     /// UCI strings of played moves (for autosave).
-    ucis: Vec<String>,
+    ucis: Vec<Uci>,
     /// Side that resigned, if any.
-    resigned: Option<Color>,
+    resigned: Option<Side>,
     /// Both players agreed a draw.
     agreed_draw: bool,
 }
@@ -82,7 +84,7 @@ impl GameSession {
         session.past = positions[..positions.len().saturating_sub(1)].to_vec();
         session.sans = saved.sans.clone();
         session.ucis = saved.moves.clone();
-        session.resigned = saved.resigned.as_deref().and_then(|s| s.parse::<Color>().ok());
+        session.resigned = saved.resigned;
         session.agreed_draw = saved.agreed_draw;
         // A saved game that already ended restores its finished state;
         // `begin()` will not resurrect it.
@@ -157,19 +159,22 @@ impl GameSession {
         self.position.turn()
     }
 
-    /// The user-facing target square of a move: for castling this is the
-    /// king's destination (the user taps g1/c1 or the rook itself), for
-    /// all other moves `to()`.
-    fn target_of(mv: &Move) -> Square {
-        match mv {
-            // Castle carries king/rook *origin* squares; the user taps the
-            // king's destination instead.
-            Move::Castle { king, rook } => {
-                let file = if rook > king { File::G } else { File::C };
-                Square::from_coords(file, king.rank())
+    /// Pieces captured so far (material diff against the starting
+    /// position), in canonical order: white's losses first, then
+    /// black's, most valuable role first. Parking strips render them
+    /// in this order.
+    pub fn captured_pieces(&self) -> Vec<Piece> {
+        let initial = self.past.first().unwrap_or(&self.position);
+        let mut captured = Vec::new();
+        for color in [Color::White, Color::Black] {
+            for role in [Role::Queen, Role::Rook, Role::Bishop, Role::Knight, Role::Pawn] {
+                let piece = Piece { color, role };
+                let before = initial.board().by_piece(piece).count();
+                let now = self.position.board().by_piece(piece).count();
+                captured.extend(std::iter::repeat_n(piece, before.saturating_sub(now)));
             }
-            _ => mv.to(),
         }
+        captured
     }
 
     /// Legal destination squares for the piece on `square`, as the user
@@ -179,7 +184,7 @@ impl GameSession {
             .legal_moves()
             .into_iter()
             .filter(|mv| mv.from() == Some(square))
-            .map(|mv| Self::target_of(&mv))
+            .map(|mv| MoveRequest::target_of(&mv))
             .collect()
     }
 
@@ -190,42 +195,31 @@ impl GameSession {
     /// with `promotion` set.
     pub fn request_move(&mut self, request: MoveRequest) -> MoveOutcome {
         if self.phase != GamePhase::InProgress {
-            return MoveOutcome::Illegal {
-                reason: format!("game is in phase {:?}", self.phase),
-            };
+            return MoveOutcome::Illegal(IllegalReason::WrongPhase(self.phase));
         }
-        let candidates: Vec<Move> = self
-            .position
-            .legal_moves()
-            .into_iter()
-            .filter(|mv| mv.from() == Some(request.from) && (Self::target_of(mv) == request.to || mv.to() == request.to))
-            .collect();
+        let candidates: Vec<Move> = self.position.legal_moves().into_iter().filter(|mv| request.matches(mv)).collect();
         if candidates.is_empty() {
-            return MoveOutcome::Illegal {
-                reason: format!("{}-{} is not a legal move", request.from, request.to),
-            };
+            return MoveOutcome::Illegal(IllegalReason::NotLegal(request));
         }
         if candidates.iter().any(|mv| mv.is_promotion()) && request.promotion.is_none() {
             return MoveOutcome::NeedsPromotion { to: request.to };
         }
         let Some(mv) = candidates.into_iter().find(|mv| promotion_role(mv) == request.promotion) else {
-            return MoveOutcome::Illegal {
-                reason: "no matching move for the given promotion".to_string(),
-            };
+            return MoveOutcome::Illegal(IllegalReason::BadPromotion);
         };
         match self.position.clone().play(mv) {
             Ok(next) => {
-                let san = SanPlus::from_move(self.position.clone(), mv).to_string();
+                let san = San::from_move(self.position.clone(), mv);
                 self.future.clear();
                 self.past.push(self.position.clone());
                 self.position = next.clone();
                 self.hashes.push(next.zobrist_hash::<Zobrist64>(EnPassantMode::Legal));
                 self.sans.push(san.clone());
-                self.ucis.push(mv.to_uci(CastlingMode::Standard).to_string());
+                self.ucis.push(Uci::from_move(&mv));
                 self.finish_if_terminal();
-                MoveOutcome::Applied { san }
+                MoveOutcome::Applied(san)
             }
-            Err(err) => MoveOutcome::Illegal { reason: err.to_string() },
+            Err(err) => MoveOutcome::Illegal(IllegalReason::PlayRejected(err.to_string())),
         }
     }
 
@@ -297,7 +291,7 @@ impl GameSession {
     /// rules). `None` while the game is ongoing.
     pub fn outcome(&self) -> Option<KnownOutcome> {
         if let Some(loser) = self.resigned {
-            return Some(KnownOutcome::Decisive { winner: loser.other() });
+            return Some(KnownOutcome::Decisive { winner: loser.other().into() });
         }
         if self.agreed_draw || self.automatic_draw().is_some() {
             return Some(KnownOutcome::Draw);
@@ -347,9 +341,9 @@ impl GameSession {
         None
     }
 
-    /// Resigns the game for `color`.
-    pub fn resign(&mut self, color: Color) {
-        self.resigned = Some(color);
+    /// Resigns the game for `side`.
+    pub fn resign(&mut self, side: Side) {
+        self.resigned = Some(side);
         self.phase = GamePhase::Finished;
     }
 
@@ -367,13 +361,18 @@ impl GameSession {
     }
 
     /// SAN strings of all played moves.
-    pub fn san_history(&self) -> &[String] {
+    pub fn san_history(&self) -> &[San] {
         &self.sans
     }
 
+    /// Played moves in UCI notation (autosave/replay format).
+    pub fn uci_history(&self) -> &[Uci] {
+        &self.ucis
+    }
+
     /// Current FEN.
-    pub fn fen(&self) -> String {
-        Fen::from_position(&self.position, EnPassantMode::Legal).to_string()
+    pub fn fen(&self) -> Fen {
+        Fen::from_position(&self.position)
     }
 
     /// Serializes the session for autosave.
@@ -382,7 +381,7 @@ impl GameSession {
             config: self.config.clone(),
             moves: self.ucis.clone(),
             sans: self.sans.clone(),
-            resigned: self.resigned.map(|c| c.to_string()),
+            resigned: self.resigned,
             agreed_draw: self.agreed_draw,
         }
     }
@@ -414,6 +413,8 @@ mod tests {
     use crate::GamePhase;
     use crate::MoveOutcome;
     use crate::MoveRequest;
+    use crate::San;
+    use crate::Side;
     use crate::TangibleMode;
 
     fn session() -> GameSession {
@@ -445,19 +446,19 @@ mod tests {
     fn legal_move_applies_and_records_san() {
         let mut session = session();
         let outcome = session.request_move(MoveRequest::new(Square::E2, Square::E4));
-        assert!(matches!(outcome, MoveOutcome::Applied { .. }));
-        if let MoveOutcome::Applied { san } = outcome {
-            assert_eq!(san, "e4");
+        assert!(matches!(outcome, MoveOutcome::Applied(_)));
+        if let MoveOutcome::Applied(san) = outcome {
+            assert_eq!(san.as_str(), "e4");
         }
         assert_eq!(session.turn(), Color::Black);
-        assert_eq!(session.san_history(), &["e4".to_string()]);
+        assert_eq!(session.san_history(), &[San::from("e4")]);
     }
 
     #[test]
     fn illegal_move_is_rejected() {
         let mut session = session();
         let outcome = session.request_move(MoveRequest::new(Square::E2, Square::E5));
-        assert!(matches!(outcome, MoveOutcome::Illegal { .. }));
+        assert!(matches!(outcome, MoveOutcome::Illegal(_)));
         assert_eq!(session.turn(), Color::White);
     }
 
@@ -473,7 +474,7 @@ mod tests {
         // Tap king e1, then its castling destination g1.
         let outcome = session.request_move(MoveRequest::new(Square::E1, Square::G1));
         assert!(matches!(outcome, MoveOutcome::Applied { .. }));
-        assert_eq!(session.san_history().last().map(String::as_str), Some("O-O"));
+        assert_eq!(session.san_history().last().map(San::as_str), Some("O-O"));
     }
 
     #[test]
@@ -490,7 +491,7 @@ mod tests {
         assert!(matches!(outcome, MoveOutcome::NeedsPromotion { .. }));
         let outcome = session.request_move(MoveRequest::promoting(Square::B7, Square::A8, Role::Queen));
         assert!(matches!(outcome, MoveOutcome::Applied { .. }));
-        assert_eq!(session.san_history().last().map(String::as_str), Some("bxa8=Q"));
+        assert_eq!(session.san_history().last().map(San::as_str), Some("bxa8=Q"));
     }
 
     #[test]
@@ -525,7 +526,7 @@ mod tests {
         assert!(session.undo().is_some());
         assert!(session.can_redo());
         assert!(session.redo().is_some());
-        assert_eq!(session.san_history(), &["e4".to_string(), "e5".to_string()]);
+        assert_eq!(session.san_history(), &[San::from("e4"), San::from("e5")]);
         assert_eq!(session.turn(), Color::White);
         assert!(!session.can_redo());
     }
@@ -538,7 +539,7 @@ mod tests {
         session.undo();
         session.request_move(MoveRequest::new(Square::C7, Square::C5));
         assert!(!session.can_redo());
-        assert_eq!(session.san_history(), &["e4".to_string(), "c5".to_string()]);
+        assert_eq!(session.san_history(), &[San::from("e4"), San::from("c5")]);
     }
 
     #[test]
@@ -607,7 +608,7 @@ mod tests {
     #[test]
     fn resignation_decides_game() {
         let mut session = session();
-        session.resign(Color::Black);
+        session.resign(Side::Black);
         assert_eq!(session.phase(), GamePhase::Finished);
         assert!(session.outcome().is_some());
     }
