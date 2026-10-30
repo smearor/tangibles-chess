@@ -9,20 +9,20 @@ use tangibles_chess_config::GameConfig;
 use tangibles_chess_material::Piece;
 use tangibles_chess_material::Role;
 use tangibles_chess_material::Side;
+use tangibles_chess_moves::CheckProjection;
+use tangibles_chess_moves::GamePhase;
+use tangibles_chess_moves::IllegalReason;
+use tangibles_chess_moves::MoveOutcome;
+use tangibles_chess_moves::MoveRequest;
+use tangibles_chess_moves::PlayRejection;
+use tangibles_chess_moves::Ply;
 use tangibles_chess_notation::Fen;
 use tangibles_chess_notation::San;
 use tangibles_chess_notation::Uci;
 use tangibles_chess_undo::UndoPlan;
 
-use crate::CheckProjection;
 use crate::DrawReason;
 use crate::GameError;
-use crate::GamePhase;
-use crate::IllegalReason;
-use crate::MoveOutcome;
-use crate::MoveRequest;
-use crate::PlayRejection;
-use crate::Ply;
 use crate::SavedGame;
 
 /// A running or configured chess game.
@@ -410,14 +410,14 @@ mod tests {
     use shakmaty::Square;
 
     use super::GameSession;
-    use crate::GamePhase;
-    use crate::MoveOutcome;
-    use crate::MoveRequest;
-    use crate::Ply;
     use tangibles_chess_config::GameConfig;
     use tangibles_chess_config::TangibleMode;
     use tangibles_chess_material::Role;
     use tangibles_chess_material::Side;
+    use tangibles_chess_moves::GamePhase;
+    use tangibles_chess_moves::MoveOutcome;
+    use tangibles_chess_moves::MoveRequest;
+    use tangibles_chess_moves::Ply;
     use tangibles_chess_notation::San;
 
     fn session() -> GameSession {

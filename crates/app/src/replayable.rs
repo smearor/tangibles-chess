@@ -1,6 +1,6 @@
 //! Stepping through a finished game's recorded plies.
 
-use tangibles_chess_core::Ply;
+use tangibles_chess_moves::Ply;
 
 /// Replay navigation on a finished game: a cursor walks the recorded
 /// move list without mutating the session.

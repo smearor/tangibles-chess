@@ -2,9 +2,9 @@
 //! actions.
 
 use shakmaty::Square;
-use tangibles_chess_core::MoveOutcome;
-use tangibles_chess_core::MoveRequest;
 use tangibles_chess_material::Side;
+use tangibles_chess_moves::MoveOutcome;
+use tangibles_chess_moves::MoveRequest;
 
 /// The playing surface's verb surface: scene taps, validated move
 /// application, and the two ways a game ends by consent.

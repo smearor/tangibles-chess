@@ -7,12 +7,12 @@ use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_config::GameConfig;
 use tangibles_chess_core::DrawReason;
-use tangibles_chess_core::GamePhase;
-use tangibles_chess_core::MoveRequest;
-use tangibles_chess_core::Ply;
 use tangibles_chess_icons::icon_names;
 use tangibles_chess_material::Piece;
 use tangibles_chess_material::Side;
+use tangibles_chess_moves::GamePhase;
+use tangibles_chess_moves::MoveRequest;
+use tangibles_chess_moves::Ply;
 use tangibles_chess_tangibles::TableEdge;
 
 use super::game_controller::GameController;

@@ -1,5 +1,5 @@
-use crate::GamePhase;
-use crate::Ply;
+use tangibles_chess_moves::GamePhase;
+use tangibles_chess_moves::Ply;
 use tangibles_chess_notation::Uci;
 use thiserror::Error;
 

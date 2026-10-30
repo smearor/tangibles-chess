@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk4::prelude::*;
-use tangibles_chess_core::Ply;
 use tangibles_chess_material::Side;
+use tangibles_chess_moves::Ply;
 use tangibles_chess_notation::San;
 use tracing::debug;
 

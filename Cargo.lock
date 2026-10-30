@@ -2876,6 +2876,7 @@ dependencies = [
  "tangibles-chess-icons",
  "tangibles-chess-material",
  "tangibles-chess-mcp",
+ "tangibles-chess-moves",
  "tangibles-chess-notation",
  "tangibles-chess-tangibles",
  "thiserror 2.0.21",
@@ -2902,6 +2903,7 @@ dependencies = [
  "shakmaty",
  "tangibles-chess-config",
  "tangibles-chess-material",
+ "tangibles-chess-moves",
  "tangibles-chess-notation",
  "tangibles-chess-undo",
  "thiserror 2.0.21",
@@ -2964,10 +2966,21 @@ dependencies = [
  "tangibles-chess-config",
  "tangibles-chess-core",
  "tangibles-chess-material",
+ "tangibles-chess-moves",
  "tangibles-chess-notation",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tangibles-chess-moves"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "shakmaty",
+ "tangibles-chess-material",
+ "tangibles-chess-notation",
 ]
 
 [[package]]
@@ -2991,9 +3004,9 @@ dependencies = [
  "tangible-objects-client",
  "tangible-objects-model",
  "tangibles-chess-config",
- "tangibles-chess-core",
  "tangibles-chess-geometry",
  "tangibles-chess-material",
+ "tangibles-chess-moves",
  "thiserror 2.0.21",
  "tokio",
  "tracing",

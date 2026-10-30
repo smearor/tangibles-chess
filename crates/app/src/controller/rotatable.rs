@@ -1,6 +1,6 @@
 //! `Rotatable` on the controller: quarter-turn board rotation.
 
-use tangibles_chess_core::GamePhase;
+use tangibles_chess_moves::GamePhase;
 use tangibles_chess_tangibles::BoardGeometry;
 use tangibles_chess_tangibles::MoveInference;
 use tangibles_chess_tangibles::PlacementGate;

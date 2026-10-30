@@ -1,0 +1,15 @@
+[package]
+name = "tangibles-chess-moves"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Move domain for tangibles-chess: requests, outcomes, projections, plies and game phases"
+
+[dependencies]
+serde.workspace = true
+shakmaty.workspace = true
+tangibles-chess-material.workspace = true
+tangibles-chess-notation.workspace = true

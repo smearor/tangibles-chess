@@ -16,6 +16,7 @@ tangibles-chess-engine.workspace = true
 tangibles-chess-geometry.workspace = true
 tangibles-chess-icons.workspace = true
 tangibles-chess-material.workspace = true
+tangibles-chess-moves.workspace = true
 gtk4.workspace = true
 libadwaita.workspace = true
 gio.workspace = true

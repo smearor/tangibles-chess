@@ -5,11 +5,11 @@ use shakmaty::Position;
 use shakmaty::uci::UciMove;
 use tangibles_chess_config::GameConfig;
 use tangibles_chess_material::Side;
+use tangibles_chess_moves::Ply;
 use tangibles_chess_notation::San;
 use tangibles_chess_notation::Uci;
 
 use crate::GameError;
-use crate::Ply;
 
 /// Persistent snapshot of a game for autosave/resume.
 ///

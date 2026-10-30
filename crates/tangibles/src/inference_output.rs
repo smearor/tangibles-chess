@@ -1,4 +1,4 @@
-use tangibles_chess_core::MoveRequest;
+use tangibles_chess_moves::MoveRequest;
 
 use crate::Anomaly;
 use crate::ZoneAction;

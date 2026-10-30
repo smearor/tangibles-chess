@@ -20,6 +20,7 @@ tangibles-chess-geometry = { path = "crates/geometry" }
 tangibles-chess-icons = { path = "crates/icons" }
 tangibles-chess-material = { path = "crates/material" }
 tangibles-chess-mcp = { path = "crates/mcp" }
+tangibles-chess-moves = { path = "crates/moves" }
 tangibles-chess-notation = { path = "crates/notation" }
 tangibles-chess-tangibles = { path = "crates/tangibles" }
 tangibles-chess-undo = { path = "crates/undo" }

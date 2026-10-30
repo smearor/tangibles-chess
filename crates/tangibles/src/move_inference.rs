@@ -4,7 +4,7 @@ use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_config::CommitMode;
-use tangibles_chess_core::MoveRequest;
+use tangibles_chess_moves::MoveRequest;
 
 use crate::Anomaly;
 use crate::BoardGeometry;
@@ -243,7 +243,7 @@ mod tests {
     use shakmaty::Square;
     use shakmaty::fen::Fen;
     use tangibles_chess_config::CommitMode;
-    use tangibles_chess_core::MoveRequest;
+    use tangibles_chess_moves::MoveRequest;
 
     use super::MoveInference;
     use crate::BoardGeometry;

@@ -1,7 +1,7 @@
 //! `Replayable` on the controller: the finished-game replay cursor.
 
-use tangibles_chess_core::GamePhase;
-use tangibles_chess_core::Ply;
+use tangibles_chess_moves::GamePhase;
+use tangibles_chess_moves::Ply;
 
 use super::game_controller::GameController;
 use crate::replayable::Replayable;

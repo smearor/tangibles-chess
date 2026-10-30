@@ -3,12 +3,12 @@
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_config::TangibleMode;
-use tangibles_chess_core::GamePhase;
-use tangibles_chess_core::MoveOutcome;
-use tangibles_chess_core::MoveRequest;
 use tangibles_chess_material::Piece;
 use tangibles_chess_material::Role;
 use tangibles_chess_material::Side;
+use tangibles_chess_moves::GamePhase;
+use tangibles_chess_moves::MoveOutcome;
+use tangibles_chess_moves::MoveRequest;
 use tracing::debug;
 use tracing::warn;
 
