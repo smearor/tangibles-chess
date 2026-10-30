@@ -2,7 +2,7 @@
 //! GTK main loop.
 
 use crate::command::CommandKind;
-use serde_json::Value;
+use crate::command_reply::CommandReply;
 use tokio::sync::oneshot::Sender;
 
 /// A command plus the channel back to the waiting tool call.
@@ -10,6 +10,6 @@ use tokio::sync::oneshot::Sender;
 pub struct GameRequest {
     /// What to execute.
     pub command: CommandKind,
-    /// Reply channel; carries the JSON answer back to the tool.
-    pub reply: Sender<Value>,
+    /// Reply channel; carries the typed answer back to the tool.
+    pub reply: Sender<CommandReply>,
 }

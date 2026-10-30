@@ -1,16 +1,17 @@
 //! The `ChessMcp` server type and its command dispatch.
 
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_channel::Sender;
 use rmcp::ErrorData;
 use rmcp::RoleServer;
 use rmcp::model::CallToolResult;
 use rmcp::model::ContentBlock;
 use rmcp::service::Peer;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::CommandKind;
 use crate::GameRequest;
+use crate::McpError;
 
 /// `(uri, peer)` pairs that subscribed via `resources/subscribe` and
 /// receive `notifications/resources/updated` on each state change.
@@ -29,15 +30,9 @@ impl ChessMcp {
     /// Dispatch a command and await its JSON reply.
     pub(super) async fn dispatch(&self, command: CommandKind) -> Result<CallToolResult, ErrorData> {
         let (reply, rx) = tokio::sync::oneshot::channel();
-        self.tx
-            .send(GameRequest { command, reply })
-            .await
-            .map_err(|_| ErrorData::internal_error("game controller channel closed", None))?;
-        match rx.await {
-            Ok(value) => Ok(CallToolResult::success(vec![ContentBlock::text(
-                serde_json::to_string_pretty(&value).map_err(|err| ErrorData::internal_error(format!("json: {err}"), None))?,
-            )])),
-            Err(_) => Ok(CallToolResult::error(vec![ContentBlock::text("controller dropped the request".to_string())])),
-        }
+        self.tx.send(GameRequest { command, reply }).await.map_err(|_| McpError::ChannelClosed)?;
+        let reply = rx.await.map_err(|_| McpError::Dropped)?;
+        let text = serde_json::to_string_pretty(&reply).map_err(McpError::from)?;
+        Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
 }

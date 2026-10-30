@@ -2949,6 +2949,7 @@ dependencies = [
  "serde_json",
  "shakmaty",
  "tangibles-chess-core",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
 ]

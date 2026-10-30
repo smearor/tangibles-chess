@@ -21,6 +21,7 @@ use rmcp::tool_handler;
 use super::chess_mcp::ChessMcp;
 use crate::CommandKind;
 use crate::GameRequest;
+use crate::McpError;
 
 #[tool_handler]
 impl ServerHandler for ChessMcp {
@@ -59,7 +60,7 @@ impl ServerHandler for ChessMcp {
     #[allow(clippy::manual_async_fn)]
     async fn read_resource(&self, request: ReadResourceRequestParams, _context: RequestContext<RoleServer>) -> Result<ReadResourceResponse, ErrorData> {
         if request.uri != crate::GAME_STATE_URI {
-            return Err(ErrorData::invalid_params(format!("unknown resource {}", request.uri), None));
+            return Err(McpError::InvalidParams(format!("unknown resource {}", request.uri)).into());
         }
         let (reply, rx) = tokio::sync::oneshot::channel();
         self.tx
@@ -68,9 +69,9 @@ impl ServerHandler for ChessMcp {
                 reply,
             })
             .await
-            .map_err(|_| ErrorData::internal_error("game controller channel closed", None))?;
-        let value = rx.await.map_err(|_| ErrorData::internal_error("controller dropped the request", None))?;
-        let text = serde_json::to_string_pretty(&value).map_err(|err| ErrorData::internal_error(format!("json: {err}"), None))?;
+            .map_err(|_| McpError::ChannelClosed)?;
+        let reply = rx.await.map_err(|_| McpError::Dropped)?;
+        let text = serde_json::to_string_pretty(&reply).map_err(McpError::from)?;
         Ok(ReadResourceResult::new(vec![ResourceContents::text(text, crate::GAME_STATE_URI).with_mime_type("application/json")]).into())
     }
 

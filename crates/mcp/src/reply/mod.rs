@@ -1,7 +1,6 @@
 //! MCP reply payloads - one `Serialize` type per tool response.
 
 mod draw_reply;
-mod error_reply;
 mod game_state_reply;
 mod legal_moves_reply;
 mod make_move_reply;
@@ -11,7 +10,6 @@ mod screenshot_reply;
 mod undo_reply;
 
 pub use draw_reply::DrawReply;
-pub use error_reply::ErrorReply;
 pub use game_state_reply::GameStateReply;
 pub use legal_moves_reply::LegalMovesReply;
 pub use make_move_reply::MakeMoveReply;

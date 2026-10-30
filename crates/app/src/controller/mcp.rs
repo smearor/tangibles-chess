@@ -21,9 +21,10 @@ use tangibles_chess_core::MoveRequest;
 use tangibles_chess_core::Role;
 use tangibles_chess_core::SquareName;
 use tangibles_chess_core::Uci;
+use tangibles_chess_mcp::CommandError;
 use tangibles_chess_mcp::CommandKind;
+use tangibles_chess_mcp::CommandReply;
 use tangibles_chess_mcp::DrawReply;
-use tangibles_chess_mcp::ErrorReply;
 use tangibles_chess_mcp::GameStateReply;
 use tangibles_chess_mcp::LegalMovesReply;
 use tangibles_chess_mcp::MakeMoveReply;
@@ -55,9 +56,7 @@ impl GameController {
         tangibles_chess_mcp::spawn_http(tx, addr, watch_rx);
         MainContext::default().spawn_local(async move {
             while let Ok(request) = rx.recv().await {
-                let mut reply = tangibles_chess_mcp::to_value(&ErrorReply {
-                    error: "no active game".to_string(),
-                });
+                let mut reply = CommandReply::Error(CommandError::NoActiveGame);
                 with_controller(|controller| {
                     reply = controller.borrow_mut().handle_mcp(&request.command);
                 });
@@ -68,10 +67,10 @@ impl GameController {
     }
 
     /// Executes one MCP command against the session and returns its
-    /// JSON reply.
-    fn handle_mcp(&mut self, command: &CommandKind) -> serde_json::Value {
+    /// typed reply.
+    fn handle_mcp(&mut self, command: &CommandKind) -> CommandReply {
         match command {
-            CommandKind::GameState => tangibles_chess_mcp::to_value(&self.mcp_game_state()),
+            CommandKind::GameState => CommandReply::GameState(self.mcp_game_state()),
             CommandKind::LegalMoves { square } => {
                 let position = self.session.position();
                 let moves: Vec<Uci> = position
@@ -80,7 +79,7 @@ impl GameController {
                     .filter(|mv| square.is_none_or(|s| mv.from() == Some(s)))
                     .map(Uci::from_move)
                     .collect();
-                tangibles_chess_mcp::to_value(&LegalMovesReply {
+                CommandReply::LegalMoves(LegalMovesReply {
                     legal_moves: moves,
                     turn: self.session.turn(),
                 })
@@ -88,9 +87,7 @@ impl GameController {
             CommandKind::MakeMove { uci } => {
                 let parsed = UciMove::try_from(uci).ok().and_then(|mv| mv.to_move(self.session.position()).ok());
                 let Some(mv) = parsed else {
-                    return tangibles_chess_mcp::to_value(&ErrorReply {
-                        error: format!("invalid move '{uci}'"),
-                    });
+                    return CommandReply::Error(CommandError::InvalidMove { uci: uci.clone() });
                 };
                 let request = MoveRequest {
                     from: mv.from().unwrap_or_else(|| mv.to()),
@@ -98,28 +95,28 @@ impl GameController {
                     promotion: mv.promotion().map(Role::from),
                 };
                 match self.apply_request(request) {
-                    MoveOutcome::Applied(san) => tangibles_chess_mcp::to_value(&MakeMoveReply::Applied {
+                    MoveOutcome::Applied(san) => CommandReply::MakeMove(MakeMoveReply::Applied {
                         applied: san,
                         fen: self.session.fen(),
                     }),
-                    MoveOutcome::NeedsPromotion { to } => tangibles_chess_mcp::to_value(&MakeMoveReply::NeedsPromotion {
+                    MoveOutcome::NeedsPromotion { to } => CommandReply::MakeMove(MakeMoveReply::NeedsPromotion {
                         needs_promotion: SquareName::from(to),
                         hint: "append a role letter, e.g. 'e7e8q'".to_string(),
                     }),
-                    MoveOutcome::Illegal(reason) => tangibles_chess_mcp::to_value(&MakeMoveReply::Illegal { illegal: reason.to_string() }),
+                    MoveOutcome::Illegal(reason) => CommandReply::MakeMove(MakeMoveReply::Illegal { illegal: reason.to_string() }),
                 }
             }
             CommandKind::Undo => match self.session.undo() {
                 Some(plan) => {
                     let steps: Vec<String> = plan.steps.iter().map(|step| step.to_string()).collect();
                     self.sync_scene();
-                    tangibles_chess_mcp::to_value(&UndoReply::Done {
+                    CommandReply::Undo(UndoReply::Done {
                         undone: true,
                         steps,
                         fen: self.session.fen(),
                     })
                 }
-                None => tangibles_chess_mcp::to_value(&UndoReply::Empty {
+                None => CommandReply::Undo(UndoReply::Empty {
                     undone: false,
                     reason: "nothing to undo".to_string(),
                 }),
@@ -128,7 +125,7 @@ impl GameController {
                 self.session.resign(*color);
                 self.session.finish_if_terminal();
                 self.sync_scene();
-                tangibles_chess_mcp::to_value(&ResignReply {
+                CommandReply::Resign(ResignReply {
                     resigned: *color,
                     outcome: self.session.outcome().map(GameOutcome::from),
                 })
@@ -137,7 +134,7 @@ impl GameController {
                 self.session.agree_draw();
                 self.session.finish_if_terminal();
                 self.sync_scene();
-                tangibles_chess_mcp::to_value(&DrawReply {
+                CommandReply::Draw(DrawReply {
                     draw_agreed: true,
                     outcome: self.session.outcome().map(GameOutcome::from),
                 })
@@ -145,7 +142,7 @@ impl GameController {
             CommandKind::Screenshot => self.mcp_screenshot(),
             CommandKind::PlacementStatus => {
                 let status = self.gate.check(self.session.position(), &self.probe);
-                tangibles_chess_mcp::to_value(&PlacementReply {
+                CommandReply::Placement(PlacementReply {
                     placed: status.placed(),
                     total: status.total,
                     missing: status.missing.iter().map(|s| SquareName::from(*s)).collect(),
@@ -157,14 +154,12 @@ impl GameController {
     }
 
     /// PNG screenshot of the window for the MCP `screenshot` tool.
-    fn mcp_screenshot(&self) -> serde_json::Value {
+    fn mcp_screenshot(&self) -> CommandReply {
         let Some(texture) = self.screenshot_texture() else {
-            return tangibles_chess_mcp::to_value(&ErrorReply {
-                error: "window is not realized".to_string(),
-            });
+            return CommandReply::Error(CommandError::WindowNotRealized);
         };
         let bytes = texture.save_to_png_bytes();
-        tangibles_chess_mcp::to_value(&ScreenshotReply {
+        CommandReply::Screenshot(ScreenshotReply {
             png_base64: gtk4::glib::base64_encode(bytes.as_ref()).to_string(),
             width: texture.width(),
             height: texture.height(),

@@ -14,7 +14,9 @@ use super::legal_moves_args::LegalMovesArgs;
 use super::make_move_args::MakeMoveArgs;
 use super::resign_args::ResignArgs;
 use crate::CommandKind;
+use crate::CommandReply;
 use crate::GameRequest;
+use crate::McpError;
 
 #[tool_router(vis = "pub(super)")]
 impl ChessMcp {
@@ -32,7 +34,7 @@ impl ChessMcp {
             .as_deref()
             .map(str::parse)
             .transpose()
-            .map_err(|_| ErrorData::invalid_params("invalid square name", None))?;
+            .map_err(|_| McpError::InvalidParams("invalid square name".to_string()))?;
         self.dispatch(CommandKind::LegalMoves { square }).await
     }
 
@@ -54,7 +56,7 @@ impl ChessMcp {
         let color = args
             .color
             .parse::<Side>()
-            .map_err(|_| ErrorData::invalid_params("color must be 'white' or 'black'", None))?;
+            .map_err(|_| McpError::InvalidParams("color must be 'white' or 'black'".to_string()))?;
         self.dispatch(CommandKind::Resign { color }).await
     }
 
@@ -80,26 +82,14 @@ impl ChessMcp {
                 reply,
             })
             .await
-            .map_err(|_| ErrorData::internal_error("game controller channel closed", None))?;
-        match rx.await {
-            Ok(value) => {
-                let png = value.get("png_base64").and_then(|png| png.as_str());
-                let Some(png) = png else {
-                    return Ok(CallToolResult::error(vec![ContentBlock::text(
-                        value.get("error").and_then(|e| e.as_str()).unwrap_or("no screenshot produced").to_string(),
-                    )]));
-                };
-                let meta = format!(
-                    "{}x{}",
-                    value.get("width").and_then(|w| w.as_u64()).unwrap_or(0),
-                    value.get("height").and_then(|h| h.as_u64()).unwrap_or(0)
-                );
-                Ok(CallToolResult::success(vec![
-                    ContentBlock::image(png.to_string(), "image/png".to_string()),
-                    ContentBlock::text(format!("screenshot ({meta})")),
-                ]))
-            }
-            Err(_) => Ok(CallToolResult::error(vec![ContentBlock::text("controller dropped the request".to_string())])),
+            .map_err(|_| McpError::ChannelClosed)?;
+        match rx.await.map_err(|_| McpError::Dropped)? {
+            CommandReply::Screenshot(reply) => Ok(CallToolResult::success(vec![
+                ContentBlock::image(reply.png_base64, "image/png".to_string()),
+                ContentBlock::text(format!("screenshot ({}x{})", reply.width, reply.height)),
+            ])),
+            CommandReply::Error(err) => Ok(CallToolResult::error(vec![ContentBlock::text(err.to_string())])),
+            _ => Err(McpError::InvalidParams("unexpected reply kind for screenshot".to_string()).into()),
         }
     }
 }

@@ -7,14 +7,19 @@
 //! and awaits the reply on a tokio oneshot.
 
 mod command;
+mod command_error;
+mod command_reply;
 mod game_request;
+mod mcp_error;
 mod reply;
 mod server;
 
 pub use command::CommandKind;
+pub use command_error::CommandError;
+pub use command_reply::CommandReply;
 pub use game_request::GameRequest;
+pub use mcp_error::McpError;
 pub use reply::DrawReply;
-pub use reply::ErrorReply;
 pub use reply::GameStateReply;
 pub use reply::LegalMovesReply;
 pub use reply::MakeMoveReply;
