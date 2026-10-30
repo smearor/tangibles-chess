@@ -3,11 +3,11 @@ use serde::Serialize;
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::uci::UciMove;
+use tangibles_chess_config::GameConfig;
 use tangibles_chess_material::Side;
 use tangibles_chess_notation::San;
 use tangibles_chess_notation::Uci;
 
-use crate::GameConfig;
 use crate::GameError;
 use crate::Ply;
 
@@ -77,7 +77,7 @@ impl SavedGame {
 #[cfg(test)]
 mod tests {
     use super::SavedGame;
-    use crate::GameConfig;
+    use tangibles_chess_config::GameConfig;
     use tangibles_chess_notation::San;
     use tangibles_chess_notation::Uci;
 

@@ -9,6 +9,7 @@ repository.workspace = true
 description = "Tangible input for tangibles-chess: GraphQL client to the tangible-objects daemon, board geometry, move inference"
 
 [dependencies]
+tangibles-chess-config.workspace = true
 tangibles-chess-core.workspace = true
 tangibles-chess-geometry.workspace = true
 tangibles-chess-material.workspace = true

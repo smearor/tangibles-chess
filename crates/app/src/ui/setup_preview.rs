@@ -4,10 +4,10 @@
 
 use gtk4::cairo::Context;
 use gtk4::prelude::*;
-use tangibles_chess_core::BoardTheme;
-use tangibles_chess_core::CommitMode;
-use tangibles_chess_core::OpponentKind;
-use tangibles_chess_core::TangibleMode;
+use tangibles_chess_config::BoardTheme;
+use tangibles_chess_config::CommitMode;
+use tangibles_chess_config::OpponentKind;
+use tangibles_chess_config::TangibleMode;
 
 use crate::theme::ThemePalette;
 

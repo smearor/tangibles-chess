@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
-use tangibles_chess_core::CommitMode;
+use tangibles_chess_config::CommitMode;
 use tangibles_chess_core::MoveRequest;
 
 use crate::Anomaly;
@@ -242,7 +242,7 @@ mod tests {
     use shakmaty::Chess;
     use shakmaty::Square;
     use shakmaty::fen::Fen;
-    use tangibles_chess_core::CommitMode;
+    use tangibles_chess_config::CommitMode;
     use tangibles_chess_core::MoveRequest;
 
     use super::MoveInference;

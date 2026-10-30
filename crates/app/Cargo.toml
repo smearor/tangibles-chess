@@ -9,6 +9,7 @@ repository.workspace = true
 description = "Tabletop chess for the smart desk: GTK4/libadwaita app with rotatable board, dual-facing controls and tangible-figures mode"
 
 [dependencies]
+tangibles-chess-config.workspace = true
 tangibles-chess-core.workspace = true
 tangibles-chess-tangibles.workspace = true
 tangibles-chess-engine.workspace = true

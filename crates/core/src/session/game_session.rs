@@ -5,6 +5,7 @@ use shakmaty::Move;
 use shakmaty::Position;
 use shakmaty::Square;
 use shakmaty::zobrist::Zobrist64;
+use tangibles_chess_config::GameConfig;
 use tangibles_chess_material::Piece;
 use tangibles_chess_material::Role;
 use tangibles_chess_material::Side;
@@ -14,7 +15,6 @@ use tangibles_chess_notation::Uci;
 
 use crate::CheckProjection;
 use crate::DrawReason;
-use crate::GameConfig;
 use crate::GameError;
 use crate::GamePhase;
 use crate::IllegalReason;
@@ -410,12 +410,12 @@ mod tests {
     use shakmaty::Square;
 
     use super::GameSession;
-    use crate::GameConfig;
     use crate::GamePhase;
     use crate::MoveOutcome;
     use crate::MoveRequest;
     use crate::Ply;
-    use crate::TangibleMode;
+    use tangibles_chess_config::GameConfig;
+    use tangibles_chess_config::TangibleMode;
     use tangibles_chess_material::Role;
     use tangibles_chess_material::Side;
     use tangibles_chess_notation::San;

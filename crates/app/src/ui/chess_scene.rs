@@ -10,7 +10,7 @@ use gtk4::subclass::prelude::*;
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
-use tangibles_chess_core::BoardTheme;
+use tangibles_chess_config::BoardTheme;
 use tangibles_chess_material::Piece;
 
 use crate::theme::TextureLayout;

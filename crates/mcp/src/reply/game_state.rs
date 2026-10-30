@@ -1,10 +1,10 @@
 //! The `game_state` reply shape.
 
 use serde::Serialize;
+use tangibles_chess_config::TangibleMode;
 use tangibles_chess_core::DrawReason;
 use tangibles_chess_core::GameOutcome;
 use tangibles_chess_core::GamePhase;
-use tangibles_chess_core::TangibleMode;
 use tangibles_chess_material::Side;
 use tangibles_chess_notation::Fen;
 use tangibles_chess_notation::San;

@@ -9,6 +9,7 @@ repository.workspace = true
 description = "MCP server for tangibles-chess: game-state introspection and move control"
 
 [dependencies]
+tangibles-chess-config.workspace = true
 tangibles-chess-core.workspace = true
 tangibles-chess-material.workspace = true
 tangibles-chess-notation.workspace = true

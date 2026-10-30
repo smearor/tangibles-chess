@@ -1,4 +1,4 @@
-use tangibles_chess_core::BoardTheme;
+use tangibles_chess_config::BoardTheme;
 
 /// Color pair of one board theme plus accent colors for highlights.
 ///

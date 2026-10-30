@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde::Serialize;
-use tangibles_chess_core::GameConfig;
+use tangibles_chess_config::GameConfig;
 
 /// Persisted app-level settings (last used game configuration, sound,
 /// daemon endpoint).
