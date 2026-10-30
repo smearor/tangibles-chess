@@ -1,6 +1,7 @@
 use crate::l10n::L10n;
+use gtk4::Align;
+use gtk4::Orientation;
 use gtk4::prelude::*;
-use gtk4::{Align, Orientation};
 use smearor_wrot_rotation::RotationWidget;
 use smearor_wrot_rotation::SmearorRotation;
 use std::rc::Rc;

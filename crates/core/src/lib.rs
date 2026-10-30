@@ -5,14 +5,10 @@
 //! config enums describe how a game is set up (tangible mode, commit mode,
 //! theme, orientation, opponent kinds).
 
-mod material;
 mod moves;
 mod session;
 mod undo;
 
-pub use material::Piece;
-pub use material::Role;
-pub use material::Side;
 pub use moves::CheckProjection;
 pub use moves::IllegalReason;
 pub use moves::MoveOutcome;
@@ -33,6 +29,9 @@ pub use tangibles_chess_config::TangibleMode;
 pub use tangibles_chess_geometry::BoardOrientation;
 pub use tangibles_chess_geometry::FieldIndex;
 pub use tangibles_chess_geometry::SceneIndex;
+pub use tangibles_chess_material::Piece;
+pub use tangibles_chess_material::Role;
+pub use tangibles_chess_material::Side;
 pub use tangibles_chess_notation::Fen;
 pub use tangibles_chess_notation::San;
 pub use tangibles_chess_notation::SquareName;

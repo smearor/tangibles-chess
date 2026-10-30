@@ -114,7 +114,8 @@ pub(crate) enum FlashRole {
 /// All input arrives already un-rotated in scene coordinates.
 mod imp {
     use super::*;
-    use gtk4::{IconLookupFlags, TextDirection};
+    use gtk4::IconLookupFlags;
+    use gtk4::TextDirection;
 
     /// Implementation state of [`ChessScene`].
     #[derive(Default)]
