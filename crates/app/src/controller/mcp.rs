@@ -15,9 +15,11 @@ use shakmaty::Position;
 use shakmaty::uci::UciMove;
 use std::cell::RefCell;
 use std::net::SocketAddr;
+use tangibles_chess_core::GameOutcome;
 use tangibles_chess_core::MoveOutcome;
 use tangibles_chess_core::MoveRequest;
 use tangibles_chess_core::Role;
+use tangibles_chess_core::SquareName;
 use tangibles_chess_core::Uci;
 use tangibles_chess_mcp::CommandKind;
 use tangibles_chess_mcp::DrawReply;
@@ -101,7 +103,7 @@ impl GameController {
                         fen: self.session.fen(),
                     }),
                     MoveOutcome::NeedsPromotion { to } => tangibles_chess_mcp::to_value(&MakeMoveReply::NeedsPromotion {
-                        needs_promotion: to.to_string(),
+                        needs_promotion: SquareName::from(to),
                         hint: "append a role letter, e.g. 'e7e8q'".to_string(),
                     }),
                     MoveOutcome::Illegal(reason) => tangibles_chess_mcp::to_value(&MakeMoveReply::Illegal { illegal: reason.to_string() }),
@@ -128,7 +130,7 @@ impl GameController {
                 self.sync_scene();
                 tangibles_chess_mcp::to_value(&ResignReply {
                     resigned: *color,
-                    outcome: self.session.outcome().map(|o| format!("{o:?}")),
+                    outcome: self.session.outcome().map(GameOutcome::from),
                 })
             }
             CommandKind::AgreeDraw => {
@@ -137,7 +139,7 @@ impl GameController {
                 self.sync_scene();
                 tangibles_chess_mcp::to_value(&DrawReply {
                     draw_agreed: true,
-                    outcome: self.session.outcome().map(|o| format!("{o:?}")),
+                    outcome: self.session.outcome().map(GameOutcome::from),
                 })
             }
             CommandKind::Screenshot => self.mcp_screenshot(),
@@ -146,8 +148,8 @@ impl GameController {
                 tangibles_chess_mcp::to_value(&PlacementReply {
                     placed: status.placed(),
                     total: status.total,
-                    missing: status.missing.iter().map(|s| s.to_string()).collect(),
-                    unexpected: status.unexpected.iter().map(|s| s.to_string()).collect(),
+                    missing: status.missing.iter().map(|s| SquareName::from(*s)).collect(),
+                    unexpected: status.unexpected.iter().map(|s| SquareName::from(*s)).collect(),
                     consistent: status.is_consistent(),
                 })
             }
@@ -230,7 +232,7 @@ impl GameController {
             fen: self.session.fen(),
             san_history: self.session.san_history().to_vec(),
             uci_history: self.session.uci_history().to_vec(),
-            outcome: self.session.outcome().map(|o| format!("{o:?}")),
+            outcome: self.session.outcome().map(GameOutcome::from),
             tangible_mode: config.tangible_mode,
             claimable_draws: self.session.claimable_draws(),
         }

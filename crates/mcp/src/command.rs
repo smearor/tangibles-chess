@@ -37,12 +37,3 @@ pub enum CommandKind {
     /// Window screenshot as a PNG (base64 in the JSON reply).
     Screenshot,
 }
-
-/// A command plus the channel back to the waiting tool call.
-#[derive(Debug)]
-pub struct GameRequest {
-    /// What to execute.
-    pub command: CommandKind,
-    /// Reply channel; carries the JSON answer back to the tool.
-    pub reply: tokio::sync::oneshot::Sender<serde_json::Value>,
-}

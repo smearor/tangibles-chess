@@ -3,6 +3,7 @@
 use serde::Serialize;
 use tangibles_chess_core::Fen;
 use tangibles_chess_core::San;
+use tangibles_chess_core::SquareName;
 
 /// Result of a `make_move` request.
 #[derive(Debug, Serialize)]
@@ -18,7 +19,7 @@ pub enum MakeMoveReply {
     /// A promotion role must be supplied and the move retried.
     NeedsPromotion {
         /// Promotion target square.
-        needs_promotion: String,
+        needs_promotion: SquareName,
         /// How to retry the request.
         hint: String,
     },

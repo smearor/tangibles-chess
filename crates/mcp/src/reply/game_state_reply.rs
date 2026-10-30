@@ -3,6 +3,7 @@
 use serde::Serialize;
 use tangibles_chess_core::DrawReason;
 use tangibles_chess_core::Fen;
+use tangibles_chess_core::GameOutcome;
 use tangibles_chess_core::GamePhase;
 use tangibles_chess_core::San;
 use tangibles_chess_core::Side;
@@ -23,7 +24,7 @@ pub struct GameStateReply {
     /// UCI moves played so far (for replay/verification).
     pub uci_history: Vec<Uci>,
     /// Terminal outcome, if the game is over.
-    pub outcome: Option<String>,
+    pub outcome: Option<GameOutcome>,
     /// Active tangible mode.
     pub tangible_mode: TangibleMode,
     /// Draws claimable in the current position.

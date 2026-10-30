@@ -7,11 +7,12 @@
 //! and awaits the reply on a tokio oneshot.
 
 mod command;
+mod game_request;
 mod reply;
 mod server;
 
 pub use command::CommandKind;
-pub use command::GameRequest;
+pub use game_request::GameRequest;
 pub use reply::DrawReply;
 pub use reply::ErrorReply;
 pub use reply::GameStateReply;
