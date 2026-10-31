@@ -36,6 +36,22 @@ impl Side {
         }
     }
 
+    /// The Fluent key for the "{Color} to move" status line.
+    pub fn to_move_key(&self) -> &'static str {
+        match self {
+            Self::White => "game-white-to-move",
+            Self::Black => "game-black-to-move",
+        }
+    }
+
+    /// The Fluent key for the "{Color} wins" result overlay.
+    pub fn wins_key(&self) -> &'static str {
+        match self {
+            Self::White => "game-white-wins",
+            Self::Black => "game-black-wins",
+        }
+    }
+
     /// The CSS class styling a player widget in this side's color.
     pub fn css_class(&self) -> &'static str {
         match self {

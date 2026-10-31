@@ -3,7 +3,8 @@
 use gdk4::prelude::DisplayExt;
 use gdk4::prelude::MonitorExt;
 use gdk4::prelude::SurfaceExt;
-use glib::{ControlFlow, MainContext};
+use glib::ControlFlow;
+use glib::MainContext;
 use gtk4::prelude::NativeExt;
 use gtk4::prelude::WidgetExt;
 use shakmaty::Position;

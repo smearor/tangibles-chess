@@ -70,3 +70,74 @@ impl L10n {
             .unwrap_or_else(|| id.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::path::Path;
+    use std::path::PathBuf;
+
+    use super::RESOURCES;
+
+    /// Every `l10n.msg`/`l10n.msg_args` literal id in the app sources
+    /// resolves to a Fluent id in each embedded catalog. `msg` falls
+    /// back to the id itself, so a typo otherwise surfaces only as an
+    /// untranslated line at runtime.
+    #[test]
+    fn message_ids_exist_in_every_locale() {
+        for key in literal_msg_ids() {
+            for (locale, ftl) in RESOURCES {
+                assert!(ftl_ids(ftl).contains(&key.as_str()), "`{key}` used via l10n.msg but missing in i18n/{locale}/main.ftl");
+            }
+        }
+    }
+
+    /// Fluent ids defined in a catalog (top-level `id =` lines).
+    fn ftl_ids(ftl: &str) -> BTreeSet<&str> {
+        ftl.lines()
+            .filter_map(|line| line.split_once('=').map(|(id, _)| id.trim()))
+            .filter(|id| !id.is_empty())
+            .collect()
+    }
+
+    /// Message ids passed literally to `l10n.msg`/`l10n.msg_args`
+    /// across the app sources.
+    fn literal_msg_ids() -> BTreeSet<String> {
+        let mut ids = BTreeSet::new();
+        for file in rust_files(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src")) {
+            // Skip this module: its test names the call sites and would
+            // match the scan needles itself.
+            if file.file_name().is_some_and(|name| name == "l10n.rs") {
+                continue;
+            }
+            let Ok(source) = std::fs::read_to_string(&file) else {
+                continue;
+            };
+            for needle in ["l10n.msg(\"", "l10n.msg_args(\""] {
+                for (index, _) in source.match_indices(needle) {
+                    if let Some(end) = source[index + needle.len()..].find('"') {
+                        ids.insert(source[index + needle.len()..index + needle.len() + end].to_string());
+                    }
+                }
+            }
+        }
+        ids
+    }
+
+    /// All `.rs` files below `dir`, recursively.
+    fn rust_files(dir: &Path) -> Vec<PathBuf> {
+        let mut files = Vec::new();
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return files;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                files.extend(rust_files(&path));
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                files.push(path);
+            }
+        }
+        files
+    }
+}

@@ -1,7 +1,6 @@
 //! Scene/panel synchronization and the presentation helpers it needs.
 
 use fluent::FluentArgs;
-use shakmaty::Color;
 use shakmaty::KnownOutcome;
 use shakmaty::Position;
 use shakmaty::Square;
@@ -65,9 +64,9 @@ impl GameController {
         let active_ply = self.replay_index.and_then(Ply::prev);
         self.screen.surface.white_sheet.set_active_ply(active_ply);
         self.screen.surface.black_sheet.set_active_ply(active_ply);
-        let (turn_text, active) = match position.turn() {
-            Color::White => (self.l10n.msg("game-white-to-move"), true),
-            Color::Black => (self.l10n.msg("game-black-to-move"), false),
+        let (turn_text, active) = {
+            let side = Side::from(position.turn());
+            (self.l10n.msg(side.to_move_key()), side == Side::White)
         };
         if self.session.phase() == GamePhase::Finished {
             if let Some(index) = self.replay_index {
@@ -115,10 +114,7 @@ impl GameController {
             return;
         }
         let (text, icon) = match self.session.outcome() {
-            Some(KnownOutcome::Decisive { winner }) => match winner {
-                Color::White => (self.l10n.msg("game-white-wins"), icon_names::TCH_TROPHY_SYMBOLIC),
-                Color::Black => (self.l10n.msg("game-black-wins"), icon_names::TCH_TROPHY_SYMBOLIC),
-            },
+            Some(KnownOutcome::Decisive { winner }) => (self.l10n.msg(Side::from(winner).wins_key()), icon_names::TCH_TROPHY_SYMBOLIC),
             Some(KnownOutcome::Draw) => {
                 // The overlay states the draw's rule (stalemate,
                 // repetition, material, agreement, ...) when known.
