@@ -12,4 +12,3 @@ description = "UCI subprocess client driving external chess engines (stockfish, 
 tangibles-chess-notation.workspace = true
 shakmaty.workspace = true
 thiserror.workspace = true
-tracing.workspace = true

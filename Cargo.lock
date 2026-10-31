@@ -2863,14 +2863,12 @@ dependencies = [
  "glib",
  "gtk4",
  "libadwaita",
- "miette",
  "serde",
  "serde_json",
  "shakmaty",
  "signal-hook",
  "smearor-wrot-rotation",
  "tangibles-chess-config",
- "tangibles-chess-engine",
  "tangibles-chess-geometry",
  "tangibles-chess-icons",
  "tangibles-chess-material",
@@ -2879,7 +2877,6 @@ dependencies = [
  "tangibles-chess-notation",
  "tangibles-chess-session",
  "tangibles-chess-tangibles",
- "thiserror 2.0.21",
  "tokio",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
@@ -2902,7 +2899,6 @@ dependencies = [
  "shakmaty",
  "tangibles-chess-notation",
  "thiserror 2.0.21",
- "tracing",
 ]
 
 [[package]]
@@ -2941,7 +2937,6 @@ version = "0.1.0"
 dependencies = [
  "async-channel",
  "axum",
- "miette",
  "rmcp",
  "schemars",
  "serde",
@@ -2988,7 +2983,6 @@ dependencies = [
  "tangibles-chess-undo",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
- "tracing",
 ]
 
 [[package]]

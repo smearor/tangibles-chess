@@ -23,5 +23,4 @@ rmcp.workspace = true
 axum.workspace = true
 tokio.workspace = true
 async-channel.workspace = true
-miette.workspace = true
 tracing.workspace = true
