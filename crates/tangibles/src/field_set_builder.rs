@@ -151,7 +151,12 @@ impl FieldSetBuilder {
         let mut fields = Vec::new();
         for row in 0..crate::CapSide::ROWS {
             let y0 = layout.by + layout.cell * f64::from(row);
-            let y1 = y0 + layout.cell;
+            // Shared boundaries must be computed by the same
+            // expression as the neighbour's edge - `y0 + cell` rounds
+            // differently than `by + cell * (row + 1)` in f64 and can
+            // leave a sub-ULP overlap the daemon's disjointness check
+            // rejects.
+            let y1 = layout.by + layout.cell * f64::from(row + 1);
             if layout.bx >= layout.cell {
                 fields.push(Self::field(
                     crate::Zone::Cap {
@@ -258,6 +263,19 @@ mod tests {
         let tray = set.fields.iter().find(|f| f.name.as_str() == "tray-south").expect("tray");
         assert_eq!(tray.region.y_min.as_f64(), 800.0);
         assert_eq!(tray.region.y_max.as_f64(), 800.0);
+    }
+
+    #[test]
+    fn parking_cells_share_exact_boundaries() {
+        // The daemon rejects overlapping fields: neighbouring cap
+        // cells must share a bitwise-equal boundary, not two
+        // independently rounded edges that drift a sub-ULP apart.
+        let set = FieldSetBuilder::new((40.5, 30.5, 481.7), (600.0, 600.0)).build();
+        assert!(set.is_disjoint());
+        let west: Vec<_> = set.fields.iter().filter(|f| f.name.as_str().starts_with("cap-west")).collect();
+        for pair in west.windows(2) {
+            assert_eq!(pair[0].region.y_max.as_f64(), pair[1].region.y_min.as_f64(), "{} vs {}", pair[0].name, pair[1].name);
+        }
     }
 
     #[test]
