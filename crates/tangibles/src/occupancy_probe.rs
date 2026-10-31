@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use tangible_objects_model::ContactCount;
 use tangibles_chess_geometry::FieldIndex;
 
 use crate::FieldEvent;
@@ -19,6 +21,8 @@ pub struct OccupancyProbe {
     occupied: BTreeSet<FieldIndex>,
     /// Occupied zone fields (`btn-*`, `tray-*`, `cap-*`).
     occupied_zones: BTreeSet<Zone>,
+    /// Live contact count per board field (diagnostics overlay).
+    counts: BTreeMap<FieldIndex, ContactCount>,
 }
 
 impl OccupancyProbe {
@@ -35,7 +39,7 @@ impl OccupancyProbe {
         let occupied = match event.kind {
             FieldEventKind::FieldPlaced => true,
             FieldEventKind::FieldLifted => false,
-            FieldEventKind::FieldCountChanged => event.count.unwrap_or(0) > 0,
+            FieldEventKind::FieldCountChanged => !event.count.unwrap_or_default().is_zero(),
             FieldEventKind::Lagged | FieldEventKind::Other => return,
         };
         match name {
@@ -44,6 +48,26 @@ impl OccupancyProbe {
                     self.occupied.insert(*index);
                 } else {
                     self.occupied.remove(index);
+                }
+                match event.kind {
+                    FieldEventKind::FieldPlaced => {
+                        self.counts
+                            .entry(*index)
+                            .and_modify(|count| *count = (*count).max(ContactCount::from(1u32)))
+                            .or_insert(ContactCount::from(1u32));
+                    }
+                    FieldEventKind::FieldLifted => {
+                        self.counts.remove(index);
+                    }
+                    FieldEventKind::FieldCountChanged => {
+                        let count = event.count.unwrap_or_default();
+                        if count.is_zero() {
+                            self.counts.remove(index);
+                        } else {
+                            self.counts.insert(*index, count);
+                        }
+                    }
+                    FieldEventKind::Lagged | FieldEventKind::Other => {}
                 }
             }
             FieldName::Zone(zone) => {
@@ -63,6 +87,7 @@ impl OccupancyProbe {
     /// that built the field set.
     pub fn refresh(&mut self, touches: &[TouchPoint], board_mm: impl Into<crate::BoardRectMm>) {
         self.occupied.clear();
+        self.counts.clear();
         let board = board_mm.into();
         let cell = board.cell().as_f64();
         let (bx, by) = (board.x.as_f64(), board.y.as_f64());
@@ -74,6 +99,7 @@ impl OccupancyProbe {
                 && let Some(index) = FieldIndex::new(row as usize * 8 + col as usize)
             {
                 self.occupied.insert(index);
+                *self.counts.entry(index).or_default() += ContactCount::from(1u32);
             }
         }
     }
@@ -81,6 +107,11 @@ impl OccupancyProbe {
     /// All currently occupied board fields (screen order).
     pub fn occupied(&self) -> &BTreeSet<FieldIndex> {
         &self.occupied
+    }
+
+    /// Live contact count per board field (empty = zero contacts).
+    pub fn counts(&self) -> &BTreeMap<FieldIndex, ContactCount> {
+        &self.counts
     }
 
     /// Whether a zone field currently holds a marker.
@@ -99,8 +130,9 @@ mod tests {
     use crate::FieldName;
     use crate::TouchPoint;
     use crate::Zone;
+    use tangible_objects_model::ContactCount;
 
-    fn event(kind: FieldEventKind, field: &str, count: Option<i32>) -> FieldEvent {
+    fn event(kind: FieldEventKind, field: &str, count: Option<ContactCount>) -> FieldEvent {
         FieldEvent {
             kind,
             field_set: Some("chess".to_string()),
@@ -128,7 +160,7 @@ mod tests {
     fn count_zero_clears_without_lift() {
         let mut probe = OccupancyProbe::default();
         probe.on_event(&event(FieldEventKind::FieldPlaced, "f9", None));
-        probe.on_event(&event(FieldEventKind::FieldCountChanged, "f9", Some(0)));
+        probe.on_event(&event(FieldEventKind::FieldCountChanged, "f9", Some(ContactCount::from(0u32))));
         assert!(probe.occupied().is_empty());
     }
 

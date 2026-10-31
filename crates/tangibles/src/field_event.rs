@@ -1,4 +1,6 @@
 use serde::Deserialize;
+use tangible_objects_model::ContactCount;
+use tangible_objects_model::EventCount;
 use tangible_objects_model::EventKind;
 use tangible_objects_model::TangibleEvent;
 
@@ -33,14 +35,14 @@ pub struct FieldEvent {
     /// or an unrecognised name kept raw).
     pub field: Option<FieldName>,
     /// Debounced contact count for `FieldCountChanged`.
-    pub count: Option<i32>,
+    pub count: Option<ContactCount>,
     /// Dropped-event count for `Lagged`.
-    pub skipped: Option<i32>,
+    pub skipped: Option<EventCount>,
 }
 
 impl FieldEvent {
     /// A synthetic lag event (e.g. on a subscription stream error).
-    pub fn lagged(skipped: Option<i32>) -> Self {
+    pub fn lagged(skipped: Option<EventCount>) -> Self {
         Self {
             kind: FieldEventKind::Lagged,
             field_set: None,
@@ -66,7 +68,7 @@ impl From<&TangibleEvent> for FieldEvent {
             kind,
             field_set: event.field_set.as_ref().map(|name| name.as_str().to_string()),
             field: event.field.as_ref().map(|name| FieldName::from(name.as_str())),
-            count: event.count.map(|count| count.as_u32() as i32),
+            count: event.count,
             skipped: event.skipped,
         }
     }
@@ -77,6 +79,8 @@ mod tests {
     use super::FieldEvent;
     use super::FieldEventKind;
     use crate::FieldName;
+    use tangible_objects_model::ContactCount;
+    use tangible_objects_model::EventCount;
 
     #[test]
     fn decodes_field_placed() {
@@ -90,9 +94,9 @@ mod tests {
     fn decodes_count_changed_and_lagged() {
         let count: FieldEvent = serde_json::from_str(r#"{"kind":"FIELD_COUNT_CHANGED","field":"f3","count":2}"#).expect("decode");
         assert_eq!(count.kind, FieldEventKind::FieldCountChanged);
-        assert_eq!(count.count, Some(2));
+        assert_eq!(count.count, Some(ContactCount::from(2u32)));
         let lagged: FieldEvent = serde_json::from_str(r#"{"kind":"LAGGED","skipped":7}"#).expect("decode");
         assert_eq!(lagged.kind, FieldEventKind::Lagged);
-        assert_eq!(lagged.skipped, Some(7));
+        assert_eq!(lagged.skipped, Some(EventCount::from(7u64)));
     }
 }

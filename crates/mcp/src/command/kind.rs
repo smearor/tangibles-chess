@@ -36,4 +36,10 @@ pub enum CommandKind {
     PlacementStatus,
     /// Window screenshot as a PNG (base64 in the JSON reply).
     Screenshot,
+    /// Open or close the diagnostics overlay (field indices, contact
+    /// counts, raw touch dots).
+    SetDiagnostics {
+        /// `true` opens the overlay, `false` closes it.
+        enabled: bool,
+    },
 }

@@ -37,6 +37,10 @@ struct Args {
     /// Use the mock tangible source instead of the daemon (development).
     #[arg(long)]
     mock: bool,
+    /// Draw the diagnostics overlay: per-field indices, contact counts
+    /// and raw touch dots (calibration bring-up).
+    #[arg(long)]
+    diagnostics: bool,
     /// Expose the game-domain MCP endpoint (Streamable HTTP, e.g.
     /// `127.0.0.1:8091` or `0.0.0.0:8091` for LAN agents).
     #[arg(long)]
@@ -81,7 +85,7 @@ fn main() -> glib::ExitCode {
         }
         install_css();
         install_shutdown_handlers(app);
-        let window = AppWindow::new(app, settings.clone(), l10n.clone(), args.mock, args.mcp_listen);
+        let window = AppWindow::new(app, settings.clone(), l10n.clone(), args.mock, args.mcp_listen, args.diagnostics);
         window.window.present();
         if std::env::var_os("TANGIBLES_NO_FULLSCREEN").is_none() {
             // Fullscreen must be requested once the window is presented;

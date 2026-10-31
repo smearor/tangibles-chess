@@ -46,11 +46,14 @@ the scene shows the live physical↔logical diff with the handshake's
 ("position restored"). `NoTangibles` skips (rendered board already
 matches); entering replay clears a pending guide.
 
-## 5. `DiagnosticsOverlay` (FR-UI-13)
+## 5. `DiagnosticsOverlay` (FR-UI-13) ✅
 
-Live per-field contact counts plus raw touch points, needed for
-calibration and hardware bring-up before V-4 can be executed
-meaningfully.
+`--diagnostics` draws the overlay inside `ChessScene`: per-field index
+(`f{n}` top-left), live contact count (bottom-right, fed by a new
+`OccupancyProbe::counts` map from `FieldCountChanged`/`refresh`), and
+raw `touchPoints` dots polled at 200ms (`set_diagnostics` timer).
+Rendering inside the scene keeps it rotation-aligned; per-cell labels
+position exactly on the registered `f*` fields.
 
 ## 6. Hardware verification (V-4, V-3)
 

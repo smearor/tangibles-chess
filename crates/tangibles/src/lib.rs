@@ -65,6 +65,13 @@ pub use tangible_objects_model::FieldSet;
 /// The millimetre unit of the field-set geometry domain.
 pub use tangible_objects_model::Millimeters;
 
+/// The contact-count domain type, re-exported so callers do not have
+/// to depend on `tangible-objects-model` directly.
+pub use tangible_objects_model::ContactCount;
+
+/// The dropped-event count domain type (lagged subscriptions).
+pub use tangible_objects_model::EventCount;
+
 /// Field set name registered with the daemon for chess.
 pub const FIELD_SET_NAME: &str = "chess";
 /// Owner name used for daemon registrations of this app.

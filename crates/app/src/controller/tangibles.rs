@@ -17,6 +17,7 @@ use tangibles_chess_material::Side;
 use tangibles_chess_moves::GamePhase;
 use tangibles_chess_tangibles::BoardRectMm;
 use tangibles_chess_tangibles::CapSide;
+use tangibles_chess_tangibles::ContactCount;
 use tangibles_chess_tangibles::FieldEvent;
 use tangibles_chess_tangibles::FieldEventKind;
 use tangibles_chess_tangibles::FieldName;
@@ -35,6 +36,7 @@ use tracing::info;
 use tracing::warn;
 
 use super::game_controller::GameController;
+use super::registry::with_controller;
 use super::source::Source;
 use crate::placement_issue::PlacementIssue;
 use crate::playable::Playable;
@@ -201,6 +203,11 @@ impl GameController {
     /// One field event from the daemon.
     fn on_field_event(&mut self, event: FieldEvent) {
         self.probe.on_event(&event);
+        if self.diagnostics {
+            self.screen.surface.scene.update(|state| {
+                state.diag_counts = self.probe.counts().iter().map(|(index, count)| (*index, count.as_u32())).collect();
+            });
+        }
         match self.session.phase() {
             GamePhase::AwaitingPlacement => self.update_placement(),
             GamePhase::InProgress => self.on_game_field_event(event),
@@ -391,23 +398,78 @@ impl GameController {
         }
     }
 
-    /// Re-queries touch points after a lagged subscription.
-    fn resync_occupancy(&mut self) {
-        let touches = match (&self.host, &self.source) {
-            (Some(host), Some(Source::Daemon(source))) => match host.touch_points(source) {
-                Ok(touches) => touches,
-                Err(err) => {
-                    warn!("touch_points resync failed: {err}");
-                    return;
-                }
-            },
+    /// Touch positions in scene pixels (board-rect anchored, mm→px).
+    fn touches_px(&self, touches: &[TouchPoint]) -> Vec<(f64, f64)> {
+        let Some((bx, by, bs)) = self.screen.surface.scene.board_rect() else {
+            return Vec::new();
+        };
+        let cell_mm = self.board_mm.cell().as_f64();
+        if cell_mm <= 0.0 || bs <= 0.0 {
+            return Vec::new();
+        }
+        let mm_per_px = cell_mm / (bs / 8.0);
+        touches
+            .iter()
+            .map(|point| {
+                (
+                    bx + (point.pos.x - self.board_mm.x.as_f64()) / mm_per_px,
+                    by + (point.pos.y - self.board_mm.y.as_f64()) / mm_per_px,
+                )
+            })
+            .collect()
+    }
+
+    /// Queries live touch points from the active source (`None` on no
+    /// source or a transient daemon error - never a fake "empty
+    /// board").
+    fn query_touches(&self) -> Option<Vec<TouchPoint>> {
+        match (&self.host, &self.source) {
+            (Some(host), Some(Source::Daemon(source))) => host.touch_points(source).ok(),
             (_, Some(Source::Mock(mock))) => {
                 let context = MainContext::default();
-                context.block_on(mock.touch_points()).unwrap_or_default()
+                Some(context.block_on(mock.touch_points()).unwrap_or_default())
             }
-            _ => return,
+            _ => None,
+        }
+    }
+
+    /// Enables the diagnostics overlay (field indices, contact counts,
+    /// raw touch dots) and starts the touch-point poll (FR-UI-13).
+    pub(crate) fn set_diagnostics(&mut self, enabled: bool) {
+        self.diagnostics = enabled;
+        self.screen.surface.scene.update(|state| state.diagnostics = enabled);
+        if !enabled {
+            return;
+        }
+        glib::timeout_add_local(Duration::from_millis(200), move || {
+            with_controller(|controller| {
+                let controller = controller.borrow();
+                if !controller.diagnostics {
+                    return;
+                }
+                // A failed poll keeps the last dots instead of blanking
+                // the overlay.
+                if let Some(touches) = controller.query_touches() {
+                    let points = controller.touches_px(&touches);
+                    controller.screen.surface.scene.update(|state| state.diag_touches = points);
+                }
+            });
+            ControlFlow::Continue
+        });
+    }
+
+    /// Re-queries touch points after a lagged subscription.
+    fn resync_occupancy(&mut self) {
+        let Some(touches) = self.query_touches() else {
+            return;
         };
         self.probe.refresh(&touches, self.board_mm);
+        if self.diagnostics {
+            self.screen.surface.scene.update(|state| {
+                state.diag_counts = self.probe.counts().iter().map(|(index, count)| (*index, count.as_u32())).collect();
+                state.diag_touches = self.touches_px(&touches);
+            });
+        }
         self.resync_parked(&touches);
         if self.session.phase() == GamePhase::AwaitingPlacement {
             self.update_placement();
@@ -443,7 +505,7 @@ impl GameController {
     }
 
     /// Updates the captured-material label for a tray zone.
-    fn update_tray(&self, edge: TableEdge, count: u32) {
+    fn update_tray(&self, edge: TableEdge, count: ContactCount) {
         let panel = if edge == self.geometry.white_edge() {
             &self.screen.surface.white_panel
         } else {

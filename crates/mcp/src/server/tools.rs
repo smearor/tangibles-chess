@@ -10,6 +10,7 @@ use tangibles_chess_material::Side;
 use tangibles_chess_notation::Uci;
 
 use super::chess_mcp::ChessMcp;
+use super::diagnostics_args::DiagnosticsArgs;
 use super::legal_moves_args::LegalMovesArgs;
 use super::make_move_args::MakeMoveArgs;
 use super::resign_args::ResignArgs;
@@ -70,6 +71,13 @@ impl ChessMcp {
     #[tool(description = "Get the placement-gate status: placed/total, missing and unexpected fields.")]
     async fn placement_status(&self) -> Result<CallToolResult, ErrorData> {
         self.dispatch(CommandKind::PlacementStatus).await
+    }
+
+    /// Opens or closes the diagnostics overlay (field indices, contact
+    /// counts, raw touch dots).
+    #[tool(description = "Open or close the diagnostics overlay showing per-field contact counts and raw touch points.")]
+    async fn set_diagnostics(&self, Parameters(args): Parameters<DiagnosticsArgs>) -> Result<CallToolResult, ErrorData> {
+        self.dispatch(CommandKind::SetDiagnostics { enabled: args.enabled }).await
     }
 
     /// PNG screenshot of the application window.

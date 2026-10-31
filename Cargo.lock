@@ -2806,7 +2806,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#36fa50bf079ea8408cfad2cd250fd51df177811e"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#997a7bd582c299c6d3f170f20cbc23192e719adf"
 dependencies = [
  "serde",
  "serde-jsonlines",
@@ -2818,7 +2818,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#36fa50bf079ea8408cfad2cd250fd51df177811e"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#997a7bd582c299c6d3f170f20cbc23192e719adf"
 dependencies = [
  "cynic",
  "futures",
@@ -2839,7 +2839,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#36fa50bf079ea8408cfad2cd250fd51df177811e"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#997a7bd582c299c6d3f170f20cbc23192e719adf"
 dependencies = [
  "cynic",
  "serde",

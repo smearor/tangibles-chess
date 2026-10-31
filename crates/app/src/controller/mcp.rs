@@ -19,6 +19,7 @@ use tangibles_chess_material::Role;
 use tangibles_chess_mcp::CommandError;
 use tangibles_chess_mcp::CommandKind;
 use tangibles_chess_mcp::CommandReply;
+use tangibles_chess_mcp::DiagnosticsReply;
 use tangibles_chess_mcp::DrawReply;
 use tangibles_chess_mcp::GameStateReply;
 use tangibles_chess_mcp::LegalMovesReply;
@@ -140,6 +141,10 @@ impl GameController {
                 })
             }
             CommandKind::Screenshot => self.mcp_screenshot(),
+            CommandKind::SetDiagnostics { enabled } => {
+                self.set_diagnostics(*enabled);
+                CommandReply::Diagnostics(DiagnosticsReply { enabled: *enabled })
+            }
             CommandKind::PlacementStatus => {
                 let status = self.gate.check(self.session.position(), &self.probe);
                 CommandReply::Placement(PlacementReply {

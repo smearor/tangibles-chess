@@ -4,6 +4,7 @@
 //! `ServerHandler` trait impl, and the HTTP spawn.
 
 mod chess_mcp;
+mod diagnostics_args;
 mod legal_moves_args;
 mod make_move_args;
 mod resign_args;

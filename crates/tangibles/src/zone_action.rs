@@ -1,3 +1,5 @@
+use tangible_objects_model::ContactCount;
+
 use crate::CapSide;
 use crate::TableEdge;
 
@@ -15,7 +17,7 @@ pub enum ZoneAction {
         /// Which physical edge's tray changed.
         edge: TableEdge,
         /// Markers currently resting on the tray.
-        count: u32,
+        count: ContactCount,
     },
     /// A marker entered or left a captured-piece parking cell beside
     /// the board.

@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
+use tangible_objects_model::ContactCount;
 use tangibles_chess_config::CommitMode;
 use tangibles_chess_material::Side;
 use tangibles_chess_moves::MoveRequest;
@@ -82,7 +83,7 @@ impl MoveInference {
                 match event.kind {
                     FieldEventKind::FieldLifted => self.on_lift(square, position),
                     FieldEventKind::FieldPlaced => self.on_place(square, position),
-                    FieldEventKind::FieldCountChanged => self.on_count(square, event.count.unwrap_or(0)),
+                    FieldEventKind::FieldCountChanged => self.on_count(square, event.count.unwrap_or_default()),
                     FieldEventKind::Lagged | FieldEventKind::Other => Vec::new(),
                 }
             }
@@ -192,8 +193,8 @@ impl MoveInference {
 
     /// Contact count changed on a board square; stacking (>1) is an
     /// anomaly worth surfacing.
-    fn on_count(&self, square: Square, count: i32) -> Vec<InferenceOutput> {
-        if count > 1 {
+    fn on_count(&self, square: Square, count: ContactCount) -> Vec<InferenceOutput> {
+        if count.as_u32() > 1 {
             return vec![Anomaly::StackedContacts.into()];
         }
         let _ = square;
@@ -233,7 +234,7 @@ impl MoveInference {
         let occupied = match event.kind {
             FieldEventKind::FieldPlaced => true,
             FieldEventKind::FieldLifted => false,
-            FieldEventKind::FieldCountChanged => event.count.is_some_and(|count| count > 0),
+            FieldEventKind::FieldCountChanged => event.count.is_some_and(|count| !count.is_zero()),
             _ => return Vec::new(),
         };
         vec![ZoneAction::CapCell { side, row, occupied }.into()]
@@ -261,12 +262,24 @@ impl MoveInference {
     /// Tray occupancy changes are reported as captured-material counts.
     fn on_tray(&self, edge: TableEdge, event: &FieldEvent) -> Vec<InferenceOutput> {
         match event.kind {
-            FieldEventKind::FieldPlaced => vec![ZoneAction::TrayCount { edge, count: 1 }.into()],
-            FieldEventKind::FieldLifted => vec![ZoneAction::TrayCount { edge, count: 0 }.into()],
+            FieldEventKind::FieldPlaced => vec![
+                ZoneAction::TrayCount {
+                    edge,
+                    count: ContactCount::from(1u32),
+                }
+                .into(),
+            ],
+            FieldEventKind::FieldLifted => vec![
+                ZoneAction::TrayCount {
+                    edge,
+                    count: ContactCount::from(0u32),
+                }
+                .into(),
+            ],
             FieldEventKind::FieldCountChanged => vec![
                 ZoneAction::TrayCount {
                     edge,
-                    count: event.count.unwrap_or(0).max(0) as u32,
+                    count: event.count.unwrap_or_default(),
                 }
                 .into(),
             ],

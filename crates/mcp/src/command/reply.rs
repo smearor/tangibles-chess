@@ -3,6 +3,7 @@
 use serde::Serialize;
 
 use super::error::CommandError;
+use crate::reply::DiagnosticsReply;
 use crate::reply::DrawReply;
 use crate::reply::GameStateReply;
 use crate::reply::LegalMovesReply;
@@ -34,6 +35,8 @@ pub enum CommandReply {
     Placement(PlacementReply),
     /// `screenshot` PNG payload.
     Screenshot(ScreenshotReply),
+    /// `set_diagnostics` overlay state.
+    Diagnostics(DiagnosticsReply),
     /// Application-level failure (`no active game`, invalid move text,
     /// unrealized window, ...).
     Error(CommandError),

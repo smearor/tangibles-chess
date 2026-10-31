@@ -17,6 +17,7 @@ pub use command::CommandKind;
 pub use command::CommandReply;
 pub use game_request::GameRequest;
 pub use mcp_error::McpError;
+pub use reply::DiagnosticsReply;
 pub use reply::DrawReply;
 pub use reply::GameStateReply;
 pub use reply::LegalMovesReply;

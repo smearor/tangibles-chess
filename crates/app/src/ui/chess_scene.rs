@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -11,6 +12,7 @@ use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_config::BoardTheme;
+use tangibles_chess_geometry::FieldIndex;
 use tangibles_chess_material::Piece;
 
 use crate::theme::TextureLayout;
@@ -39,6 +41,13 @@ pub(crate) struct SceneState {
     pub(crate) check: Option<Square>,
     /// Square whose marker is in the air (tangible lift in progress).
     pub(crate) lifted: Option<Square>,
+    /// Diagnostics overlay: draw field indices, contact counts and raw
+    /// touch points (calibration bring-up, FR-UI-13).
+    pub(crate) diagnostics: bool,
+    /// Live contact count per field (probe mirror, diagnostics).
+    pub(crate) diag_counts: BTreeMap<FieldIndex, u32>,
+    /// Raw touch positions in scene pixels (diagnostics).
+    pub(crate) diag_touches: Vec<(f64, f64)>,
     /// Destination of a buffered move intent awaiting the confirm-zone
     /// press (`OnConfirmZone`).
     pub(crate) pending: Option<Square>,
@@ -73,6 +82,9 @@ impl Default for SceneState {
             check: None,
             lifted: None,
             pending: None,
+            diagnostics: false,
+            diag_counts: BTreeMap::new(),
+            diag_touches: Vec::new(),
             ceremony: BTreeSet::new(),
             missing: Vec::new(),
             foreign: Vec::new(),
@@ -292,6 +304,23 @@ mod imp {
                 if state.ghost.is_some_and(|(_, to)| to == square) {
                     ring_highlight(&squares, x, y, cell, palette.ceremony);
                 }
+
+                // Diagnostics: field index (top-left) and live contact
+                // count (bottom-right), one per cell.
+                if state.diagnostics {
+                    let font = cell * 0.16;
+                    squares.set_font_size(font);
+                    squares.set_source_rgba(0.95, 0.3, 0.2, 0.8);
+                    squares.move_to(x + cell * 0.06, y + font * 1.2);
+                    let _ = squares.show_text(&format!("f{scene}"));
+                    if let Some(count) = FieldIndex::new(scene).and_then(|index| state.diag_counts.get(&index)) {
+                        let label = count.to_string();
+                        if let Ok(extents) = squares.text_extents(&label) {
+                            squares.move_to(x + cell - extents.width() - cell * 0.06, y + cell - font * 0.4);
+                            let _ = squares.show_text(&label);
+                        }
+                    }
+                }
             }
 
             // Material texture: one continuous luminance image multiplied
@@ -319,6 +348,15 @@ mod imp {
                 squares.rectangle(bx, by, bs, bs);
                 let _ = squares.fill();
                 squares.set_operator(gtk4::cairo::Operator::Over);
+            }
+
+            // Diagnostics: raw touch points as dots on the board area.
+            if state.diagnostics {
+                squares.set_source_rgba(0.95, 0.3, 0.2, 0.5);
+                for &(tx, ty) in &state.diag_touches {
+                    squares.arc(tx, ty, cell * 0.2, 0.0, std::f64::consts::TAU);
+                    let _ = squares.fill();
+                }
             }
 
             // Piece layer.

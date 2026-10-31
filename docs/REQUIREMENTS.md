@@ -227,7 +227,9 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   is unreachable. ✅
 - **FR-UI-12** Handshake overlay (FR-TAN-17). ✅
 - **FR-UI-13** `DiagnosticsOverlay`: live per-field contact counts +
-  raw touch points for calibration/hardware bring-up. ⬜ M2
+  raw touch points for calibration/hardware bring-up. ✅ — via
+  `--diagnostics`: `f*` index + `OccupancyProbe::counts` per cell +
+  polled touch dots, drawn inside `ChessScene`
 - **FR-UI-14** Replay mode for finished games: the result overlay
   offers a replay entry that steps through the recorded plies —
   score-sheet clicks seek, undo/redo buttons walk the cursor, physical
@@ -348,7 +350,7 @@ data MIT/Apache, Cuernavaca OFL — recorded in NOTICE).
 ## 13. Verification & Acceptance
 
 - **V-1** `cargo build/test/clippy --workspace` green, `cargo fmt
-  --check` clean. ✅ (78 tests)
+  --check` clean. ✅ (81 tests)
 - **V-2** `NoTangibles` playable end-to-end on desktop without daemon. ✅ baseline
 - **V-3** Manual tabletop checks: rotation 0/90/180/270°, touch
   accuracy, both-edge readability. ⬜

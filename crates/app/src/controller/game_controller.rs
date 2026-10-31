@@ -85,6 +85,9 @@ pub struct GameController {
     /// diff (`missing`/`foreign` markers) until the board matches the
     /// rewound position.
     pub(super) undo_guided: bool,
+    /// `DiagnosticsOverlay` on: the scene draws field indices, contact
+    /// counts and raw touch points (FR-UI-13).
+    pub(super) diagnostics: bool,
     /// Ply cursor while replaying a finished game (`None` = live).
     pub(super) replay_index: Option<Ply>,
     /// The game-over overlay widget, kept for removal when entering
@@ -132,6 +135,7 @@ impl GameController {
             illegal_seq: 0,
             rejected_move: None,
             undo_guided: false,
+            diagnostics: false,
             replay_index: None,
             result_widget: None,
         }
