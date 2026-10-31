@@ -16,6 +16,9 @@ pub struct AppSettings {
     pub daemon_url: String,
     /// Locale override; `None` = negotiate from the environment.
     pub locale: Option<String>,
+    /// UCI engine binary for engine opponents (PATH lookup).
+    #[serde(default = "default_engine_path")]
+    pub engine_path: String,
 }
 
 impl Default for AppSettings {
@@ -25,8 +28,14 @@ impl Default for AppSettings {
             sound_enabled: true,
             daemon_url: "http://127.0.0.1:8080".to_string(),
             locale: None,
+            engine_path: default_engine_path(),
         }
     }
+}
+
+/// Default engine binary (stockfish on PATH).
+fn default_engine_path() -> String {
+    "stockfish".to_string()
 }
 
 impl AppSettings {

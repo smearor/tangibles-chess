@@ -97,3 +97,6 @@ piece-rook = den Turm
 piece-queen = die Dame
 piece-king = den König
 capture-notice = { $color } schlägt { $piece } auf { $square }
+engine-thinking = Die Engine denkt...
+engine-unavailable = Engine nicht verfügbar - spiele beide Seiten
+setup-agent = Agent

@@ -97,3 +97,6 @@ piece-rook = the rook
 piece-queen = the queen
 piece-king = the king
 capture-notice = { $color } captures { $piece } on { $square }
+engine-thinking = Engine is thinking...
+engine-unavailable = Engine unavailable - play both sides
+setup-agent = Agent

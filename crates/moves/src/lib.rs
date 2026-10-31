@@ -9,6 +9,7 @@ mod outcome;
 mod play_rejection;
 mod ply;
 mod request;
+mod request_error;
 
 pub use check_projection::CheckProjection;
 pub use game_phase::GamePhase;
@@ -17,3 +18,4 @@ pub use outcome::MoveOutcome;
 pub use play_rejection::PlayRejection;
 pub use ply::Ply;
 pub use request::MoveRequest;
+pub use request_error::MoveRequestError;

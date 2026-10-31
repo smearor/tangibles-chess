@@ -147,6 +147,24 @@ pub fn opponent_preview(kind: OpponentKind) -> gtk4::DrawingArea {
                 cr.set_source_rgb(NEUTRAL_DARK.0, NEUTRAL_DARK.1, NEUTRAL_DARK.2);
                 let _ = cr.fill();
             }
+            OpponentKind::Agent => {
+                // A remote agent: three linked nodes (the agent and its
+                // endpoints on the network).
+                let nodes = [
+                    (center_x - width * 0.30, height * 0.72),
+                    (center_x, height * 0.28),
+                    (center_x + width * 0.30, height * 0.72),
+                ];
+                cr.set_source_rgb(NEUTRAL_DARK.0, NEUTRAL_DARK.1, NEUTRAL_DARK.2);
+                cr.set_line_width(width * 0.04);
+                cr.move_to(nodes[0].0, nodes[0].1);
+                cr.line_to(nodes[1].0, nodes[1].1);
+                cr.line_to(nodes[2].0, nodes[2].1);
+                let _ = cr.stroke();
+                for (nx, ny) in nodes {
+                    disc(cr, nx, ny, width * 0.10, NEUTRAL_DARK);
+                }
+            }
             OpponentKind::Engine => {
                 let size = width * 0.42;
                 let x = (width - size) / 2.0;

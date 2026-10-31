@@ -329,23 +329,19 @@ impl SetupScreen {
         });
         group.add(&commit.row);
 
-        // Opponent: one preview button per kind. The engine is reserved
-        // for M3 - visible but greyed out and unselectable.
+        // Opponent: one preview button per kind (black side only for
+        // now - the human always sits at the white edge).
         let opponent = Self::picker_row(
             ctx,
             &l10n.msg("setup-opponent-label"),
             vec![
                 (OpponentKind::Human, l10n.msg("setup-human"), setup_preview::opponent_preview(OpponentKind::Human)),
                 (OpponentKind::Engine, l10n.msg("setup-engine"), setup_preview::opponent_preview(OpponentKind::Engine)),
+                (OpponentKind::Agent, l10n.msg("setup-agent"), setup_preview::opponent_preview(OpponentKind::Agent)),
             ],
             |config| config.black,
             |config, kind| config.black = kind,
         );
-        for (kind, button) in &opponent.buttons {
-            if *kind == OpponentKind::Engine {
-                button.set_sensitive(false);
-            }
-        }
         group.add(&opponent.row);
 
         // Placement handshake and sound in one row.

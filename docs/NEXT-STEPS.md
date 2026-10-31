@@ -67,9 +67,14 @@ This closes M2.
 
 ## 7. M3 kickoff (roughly in this order)
 
-1. **Engine wiring (FR-ENG-1)** — `EngineClient` exists; spawn it off
-   the GTK thread when an `OpponentKind::Engine` side is up, feed
-   positions, apply `bestmove`. Un-greys the setup picker.
+1. **Engine wiring (FR-ENG-1)** ✅ — `ChessEngine` trait +
+   `EngineClient` impl; worker thread owns the blocking client,
+   `(Chess, Fen)` requests / `EngineReply` poll at 50ms; `bestmove`
+   flows through `MoveRequest::from_move` + `apply_request` with a
+   stale-FEN guard; `OpponentKind::Agent` added (controller-side no-op
+   like `Human`, moves arrive via MCP `make_move`); the setup picker
+   is un-greyed. `engine_path` in `settings.toml` (default
+   `stockfish`).
 2. **Chess clocks (FR-ENG-3)** — increment/fixed, per-edge display;
    pairs naturally with the engine.
 3. **Sound assets + missing cues (FR-ART-4, FR-SND-1)** —

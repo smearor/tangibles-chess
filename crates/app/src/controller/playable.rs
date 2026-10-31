@@ -95,6 +95,7 @@ impl Playable for GameController {
                 if self.session.phase() == GamePhase::Finished {
                     self.sound.play(SoundEffect::End);
                 }
+                self.maybe_engine_move();
             }
             MoveOutcome::NeedsPromotion { .. } => {
                 self.pending_promotion = Some(request);

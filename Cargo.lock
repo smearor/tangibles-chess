@@ -2855,6 +2855,7 @@ dependencies = [
  "signal-hook",
  "smearor-wrot-rotation",
  "tangibles-chess-config",
+ "tangibles-chess-engine",
  "tangibles-chess-geometry",
  "tangibles-chess-icons",
  "tangibles-chess-material",

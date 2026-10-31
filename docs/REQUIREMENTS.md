@@ -292,8 +292,9 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
 
 - **FR-ENG-1** AI opponent via external **UCI engine subprocess**
   (`tangibles-chess-engine`: spawn/uci/position/go/bestmove, run off
-  the GTK thread). 🟡 — `EngineClient` + `OpponentKind::Engine` exist;
-  the setup picker shows the engine greyed-out; ⬜ gameplay wiring
+  the GTK thread). ✅ — `ChessEngine` trait (embedded engines can
+  implement it), worker thread + reply poll, stale-FEN guard,
+  `OpponentKind::Agent` for MCP-driven sides
 - **FR-ENG-2** Optional auto-rotation toward the active player in
   `NoTangibles`. ⬜
 - **FR-ENG-3** Chess clocks (increment/fixed), per-edge display. ⬜

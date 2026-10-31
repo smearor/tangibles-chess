@@ -2,14 +2,17 @@
 
 use glib::ControlFlow;
 use gtk4::Widget;
+use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::mpsc;
 use std::time::Duration;
 use std::vec::IntoIter;
 use tangibles_chess_moves::MoveRequest;
 use tangibles_chess_moves::Ply;
+use tangibles_chess_notation::Fen;
 use tangibles_chess_session::GameSession;
 use tangibles_chess_tangibles::BoardGeometry;
 use tangibles_chess_tangibles::BoardRectMm;
@@ -19,6 +22,7 @@ use tangibles_chess_tangibles::PlacementGate;
 use tangibles_chess_tangibles::SurfaceMm;
 use tangibles_chess_tangibles::TableEdge;
 
+use super::engine::EngineReply;
 use super::registry::with_controller;
 use super::source::Source;
 use crate::l10n::L10n;
@@ -88,6 +92,16 @@ pub struct GameController {
     /// `DiagnosticsOverlay` on: the scene draws field indices, contact
     /// counts and raw touch points (FR-UI-13).
     pub(super) diagnostics: bool,
+    /// Engine worker request channel (`position, fen`); `None` when no
+    /// side is engine-controlled or the engine binary is unavailable.
+    pub(super) engine_tx: Option<mpsc::Sender<(Chess, Fen)>>,
+    /// Engine worker reply channel.
+    pub(super) engine_rx: Option<mpsc::Receiver<EngineReply>>,
+    /// A `go depth` request is in flight.
+    pub(super) engine_thinking: bool,
+    /// FEN the pending engine reply was requested for - a mismatch on
+    /// reply means the position moved on and the answer is stale.
+    pub(super) engine_pending_fen: Option<Fen>,
     /// Ply cursor while replaying a finished game (`None` = live).
     pub(super) replay_index: Option<Ply>,
     /// The game-over overlay widget, kept for removal when entering
@@ -136,6 +150,10 @@ impl GameController {
             rejected_move: None,
             undo_guided: false,
             diagnostics: false,
+            engine_tx: None,
+            engine_rx: None,
+            engine_thinking: false,
+            engine_pending_fen: None,
             replay_index: None,
             result_widget: None,
         }
@@ -148,6 +166,9 @@ impl GameController {
         let has_mock = matches!(controller.borrow().source, Some(Source::Mock(_)));
         controller.borrow_mut().session.begin();
         controller.borrow_mut().sync_scene();
+        controller.borrow_mut().spawn_engine_worker();
+        // An engine-controlled first mover starts thinking immediately.
+        controller.borrow_mut().maybe_engine_move();
         if uses_tangibles {
             // Show the placement gate immediately - without a first
             // field event the phase would otherwise sit invisibly in

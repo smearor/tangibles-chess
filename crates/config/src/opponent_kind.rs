@@ -9,4 +9,8 @@ pub enum OpponentKind {
     Human,
     /// An external UCI chess engine subprocess.
     Engine,
+    /// An external agent driving its moves over the MCP endpoint -
+    /// the controller never computes or requests a move for this
+    /// side (like `Human`, but the moves arrive via `make_move`).
+    Agent,
 }

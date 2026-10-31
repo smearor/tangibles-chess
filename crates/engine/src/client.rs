@@ -14,6 +14,7 @@ use shakmaty::Move;
 use tangibles_chess_notation::Fen;
 
 use crate::EngineError;
+use crate::chess_engine::ChessEngine;
 use crate::command::EngineCommand;
 use crate::response::EngineResponse;
 
@@ -85,6 +86,17 @@ impl EngineClient {
 
     /// Plays moves on the current game and asks for a move at `depth`.
     pub fn best_move(&mut self, position: &Chess, fen: &Fen, depth: u32) -> Result<Option<Move>, EngineError> {
+        ChessEngine::best_move(self, position, fen, depth)
+    }
+}
+
+impl ChessEngine for EngineClient {
+    fn new_game(&mut self) -> Result<(), EngineError> {
+        self.send(&EngineCommand::UciNewGame)?;
+        Ok(())
+    }
+
+    fn best_move(&mut self, position: &Chess, fen: &Fen, depth: u32) -> Result<Option<Move>, EngineError> {
         self.send(&EngineCommand::Position { fen: fen.clone() })?;
         self.send(&EngineCommand::Go { depth })?;
         let deadline = Instant::now() + Duration::from_secs(30);

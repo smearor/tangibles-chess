@@ -3,6 +3,7 @@
 //! registry, tangible lifecycle, the MCP endpoint, scene sync, and the
 //! four capability trait impls.
 
+mod engine;
 mod game_controller;
 mod mcp;
 mod playable;

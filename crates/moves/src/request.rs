@@ -3,6 +3,8 @@ use shakmaty::Move;
 use shakmaty::Square;
 use tangibles_chess_material::Role;
 
+use crate::MoveRequestError;
+
 /// A requested move between two squares, as produced by touch input or
 /// the tangible move inference.
 ///
@@ -66,6 +68,40 @@ impl MoveRequest {
                 Some(MoveRequest::new(*rook, Square::from_coords(file, king.rank())))
             }
             _ => None,
+        }
+    }
+}
+
+impl TryFrom<&Move> for MoveRequest {
+    type Error = MoveRequestError;
+
+    /// The request a user would produce to pick the legal move `mv`:
+    /// origin square and user-facing target (king's destination for
+    /// castling) - the form [`MoveRequest::matches`] expects back.
+    fn try_from(mv: &Move) -> Result<Self, Self::Error> {
+        Ok(Self {
+            from: mv.from().ok_or(MoveRequestError::NoOrigin)?,
+            to: Self::target_of(mv),
+            promotion: mv.promotion().map(Role::from),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use shakmaty::Chess;
+    use shakmaty::Position;
+
+    use super::MoveRequest;
+
+    /// Every legal move must match the request built from it - the
+    /// engine and inference paths feed the same `matches` contract.
+    #[test]
+    fn try_from_move_roundtrips_legal_moves() {
+        let position = Chess::default();
+        for mv in position.legal_moves() {
+            let request = MoveRequest::try_from(&mv).expect("try_from");
+            assert!(request.matches(&mv), "{mv:?}");
         }
     }
 }

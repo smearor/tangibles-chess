@@ -5,11 +5,13 @@
 //! Used by the app for AI opponents; blocking calls happen on dedicated
 //! threads so the GTK main loop never stalls.
 
+mod chess_engine;
 mod client;
 mod command;
 mod error;
 mod response;
 
+pub use chess_engine::ChessEngine;
 pub use client::EngineClient;
 pub use command::EngineCommand;
 pub use error::EngineError;
