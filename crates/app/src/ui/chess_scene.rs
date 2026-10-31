@@ -39,6 +39,9 @@ pub(crate) struct SceneState {
     pub(crate) check: Option<Square>,
     /// Square whose marker is in the air (tangible lift in progress).
     pub(crate) lifted: Option<Square>,
+    /// Destination of a buffered move intent awaiting the confirm-zone
+    /// press (`OnConfirmZone`).
+    pub(crate) pending: Option<Square>,
     /// Fields lit by the setup ceremony.
     pub(crate) ceremony: BTreeSet<Square>,
     /// Expected-but-missing squares (placement gate / board check).
@@ -69,6 +72,7 @@ impl Default for SceneState {
             last_move: None,
             check: None,
             lifted: None,
+            pending: None,
             ceremony: BTreeSet::new(),
             missing: Vec::new(),
             foreign: Vec::new(),
@@ -280,6 +284,10 @@ mod imp {
                 }
                 if state.lifted == Some(square) {
                     fill_highlight(&squares, x, y, cell, palette.selection, 0.18);
+                }
+                if state.pending == Some(square) {
+                    fill_highlight(&squares, x, y, cell, palette.selection, 0.28);
+                    ring_highlight(&squares, x, y, cell, palette.selection);
                 }
                 if state.ghost.is_some_and(|(_, to)| to == square) {
                     ring_highlight(&squares, x, y, cell, palette.ceremony);

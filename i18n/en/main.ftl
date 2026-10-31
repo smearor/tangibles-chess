@@ -75,6 +75,7 @@ daemon-offline = Tangible daemon not reachable - physical pieces unavailable
 anomaly-title = Board mismatch
 anomaly-detail = Physical board does not match the game state
 illegal-wrong-phase = No game is in progress
+confirm-pending = Press your button to confirm
 illegal-not-legal = Not a legal move
 illegal-bad-promotion = No matching move for that promotion
 illegal-play-rejected = Move rejected

@@ -75,6 +75,7 @@ daemon-offline = Tangible-Daemon nicht erreichbar – physische Figuren nicht ve
 anomaly-title = Brettfehler
 anomaly-detail = Das physische Brett stimmt nicht mit dem Spielstand überein
 illegal-wrong-phase = Es läuft gerade kein Spiel
+confirm-pending = Drücke deinen Knopf zum Bestätigen
 illegal-not-legal = Kein gültiger Zug
 illegal-bad-promotion = Kein passender Zug für diese Umwandlung
 illegal-play-rejected = Zug abgelehnt

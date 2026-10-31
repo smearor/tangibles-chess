@@ -4,6 +4,7 @@ use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_config::CommitMode;
+use tangibles_chess_material::Side;
 use tangibles_chess_moves::MoveRequest;
 
 use crate::Anomaly;
@@ -41,6 +42,8 @@ pub struct MoveInference {
     pending_castle_rook: Option<MoveRequest>,
     /// Intent waiting for a confirm-zone press (`OnConfirmZone`).
     pending_confirm: Option<MoveRequest>,
+    /// Origin square a taken-back marker is expected to land on.
+    takeback: Option<Square>,
 }
 
 impl MoveInference {
@@ -54,6 +57,7 @@ impl MoveInference {
             pending_capture: None,
             pending_castle_rook: None,
             pending_confirm: None,
+            takeback: None,
         }
     }
 
@@ -64,6 +68,7 @@ impl MoveInference {
         self.pending_capture = None;
         self.pending_castle_rook = None;
         self.pending_confirm = None;
+        self.takeback = None;
     }
 
     /// Handles one field event against the current position.
@@ -81,20 +86,33 @@ impl MoveInference {
                     FieldEventKind::Lagged | FieldEventKind::Other => Vec::new(),
                 }
             }
-            Some(FieldName::Zone(zone)) => self.on_zone(*zone, event),
+            Some(FieldName::Zone(zone)) => self.on_zone(*zone, event, position),
             Some(FieldName::Unknown(_)) | None => Vec::new(),
         }
     }
 
     /// A marker left a board square.
     fn on_lift(&mut self, square: Square, position: &Chess) -> Vec<InferenceOutput> {
+        // Takeback before confirming: lifting the just-placed marker off
+        // the pending destination cancels the buffered intent. The marker
+        // is in the air again; landing it back on the origin restores
+        // the physical board quietly (`takeback`).
+        if let Some(request) = self.pending_confirm
+            && request.to == square
+        {
+            self.pending_confirm = None;
+            self.pending_castle_rook = None;
+            self.in_air = Some(square);
+            self.takeback = Some(request.from);
+            return vec![InferenceOutput::Cancelled];
+        }
         // Completes a stacked capture: the opponent's marker was removed
         // from under the attacker's marker that already sits on the
         // square.
         if self.pending_capture == Some(square) {
             self.pending_capture = None;
             let Some(from) = self.in_air.take() else {
-                return vec![InferenceOutput::Anomaly(Anomaly::CaptureWithoutAir)];
+                return vec![Anomaly::CaptureWithoutAir.into()];
             };
             self.lifted_opponents.clear();
             return vec![self.commit(from, square, position)];
@@ -104,7 +122,7 @@ impl MoveInference {
             return Vec::new();
         }
         let Some(piece) = position.board().piece_at(square) else {
-            return vec![InferenceOutput::Anomaly(Anomaly::LiftOnEmptySquare)];
+            return vec![Anomaly::LiftOnEmptySquare.into()];
         };
         if self.in_air.is_some() {
             // While a piece is in the air, lifting an opponent marker is
@@ -114,10 +132,10 @@ impl MoveInference {
                 self.lifted_opponents.insert(square);
                 return Vec::new();
             }
-            return vec![InferenceOutput::Anomaly(Anomaly::TwoPiecesLifted)];
+            return vec![Anomaly::TwoPiecesLifted.into()];
         }
         if piece.color != position.turn() {
-            return vec![InferenceOutput::Anomaly(Anomaly::NonMovingSideLifted)];
+            return vec![Anomaly::NonMovingSideLifted.into()];
         }
         self.in_air = Some(square);
         Vec::new()
@@ -125,21 +143,29 @@ impl MoveInference {
 
     /// A marker touched down on a board square.
     fn on_place(&mut self, square: Square, position: &Chess) -> Vec<InferenceOutput> {
+        // A cancelled intent's marker lands back on its origin: the
+        // physical board is restored - nothing to emit.
+        if self.takeback == Some(square) {
+            self.takeback = None;
+            self.in_air = None;
+            return Vec::new();
+        }
         // Completing the rook's physical move after a castle intent.
         if let Some(rook) = self.pending_castle_rook {
             if square == rook.to {
                 self.pending_castle_rook = None;
                 return Vec::new();
             }
-            return vec![InferenceOutput::Anomaly(Anomaly::RookOffCastlingTarget)];
+            return vec![Anomaly::RookOffCastlingTarget.into()];
         }
         let Some(from) = self.in_air else {
-            return vec![InferenceOutput::Anomaly(Anomaly::PlaceWithoutLift)];
+            return vec![Anomaly::PlaceWithoutLift.into()];
         };
         if square == from {
             self.in_air = None;
             self.lifted_opponents.clear();
             self.pending_capture = None;
+            self.takeback = None;
             return vec![InferenceOutput::Cancelled];
         }
         match position.board().piece_at(square) {
@@ -160,7 +186,7 @@ impl MoveInference {
                     Vec::new()
                 }
             }
-            Some(_own) => vec![InferenceOutput::Anomaly(Anomaly::PlacedOnOwnPiece)],
+            Some(_own) => vec![Anomaly::PlacedOnOwnPiece.into()],
         }
     }
 
@@ -168,7 +194,7 @@ impl MoveInference {
     /// anomaly worth surfacing.
     fn on_count(&self, square: Square, count: i32) -> Vec<InferenceOutput> {
         if count > 1 {
-            return vec![InferenceOutput::Anomaly(Anomaly::StackedContacts)];
+            return vec![Anomaly::StackedContacts.into()];
         }
         let _ = square;
         Vec::new()
@@ -176,6 +202,7 @@ impl MoveInference {
 
     /// Emits the intent directly or buffers it for the confirm zone.
     fn commit(&mut self, from: Square, to: Square, position: &Chess) -> InferenceOutput {
+        self.takeback = None;
         let request = MoveRequest::new(from, to);
         // Detect castling: the rook's physical move is expected next.
         self.pending_castle_rook = position
@@ -183,16 +210,19 @@ impl MoveInference {
             .into_iter()
             .find(|mv| mv.is_castle() && request.matches(mv))
             .and_then(|mv| MoveRequest::castle_rook(&mv));
+        // `OnConfirmZone` defers the commit to the mover's zone press:
+        // `PendingIntent` displays the candidate, `MoveIntent` applies.
         if self.commit_mode == CommitMode::OnConfirmZone {
             self.pending_confirm = Some(request);
+            return InferenceOutput::PendingIntent(request);
         }
         InferenceOutput::MoveIntent(request)
     }
 
     /// Routes zone fields to player actions.
-    fn on_zone(&mut self, zone: Zone, event: &FieldEvent) -> Vec<InferenceOutput> {
+    fn on_zone(&mut self, zone: Zone, event: &FieldEvent, position: &Chess) -> Vec<InferenceOutput> {
         match zone {
-            zone @ (Zone::BtnSouth | Zone::BtnNorth) => self.on_confirm_zone(zone.edge(), event),
+            zone @ (Zone::BtnSouth | Zone::BtnNorth) => self.on_confirm_zone(zone.edge(), event, position),
             zone @ (Zone::TraySouth | Zone::TrayNorth) => self.on_tray(zone.edge(), event),
             Zone::Cap { side, row } => Self::on_cap_cell(side, row, event),
         }
@@ -206,18 +236,24 @@ impl MoveInference {
             FieldEventKind::FieldCountChanged => event.count.is_some_and(|count| count > 0),
             _ => return Vec::new(),
         };
-        vec![InferenceOutput::Zone(ZoneAction::CapCell { side, row, occupied })]
+        vec![ZoneAction::CapCell { side, row, occupied }.into()]
     }
 
-    /// A marker was placed on a confirm zone: completes a buffered intent
-    /// or surfaces a stray press.
-    fn on_confirm_zone(&mut self, edge: TableEdge, event: &FieldEvent) -> Vec<InferenceOutput> {
+    /// A marker was placed on a confirm zone: completes a buffered
+    /// intent when the press came from the mover's edge, otherwise
+    /// surfaces the stray press.
+    fn on_confirm_zone(&mut self, edge: TableEdge, event: &FieldEvent, position: &Chess) -> Vec<InferenceOutput> {
         if event.kind != FieldEventKind::FieldPlaced {
             return Vec::new();
         }
-        let mut outputs = vec![InferenceOutput::Zone(ZoneAction::ConfirmMove { edge })];
-        if let Some(request) = self.pending_confirm.take() {
-            outputs.push(InferenceOutput::MoveIntent(request));
+        let mut outputs = vec![ZoneAction::ConfirmMove { edge }.into()];
+        match self.pending_confirm {
+            Some(request) if edge == self.geometry.side_edge(Side::from(position.turn())) => {
+                self.pending_confirm = None;
+                outputs.push(InferenceOutput::MoveIntent(request));
+            }
+            Some(_) => outputs.push(Anomaly::ConfirmWrongEdge.into()),
+            None => outputs.push(Anomaly::ConfirmWithoutPending.into()),
         }
         outputs
     }
@@ -225,12 +261,15 @@ impl MoveInference {
     /// Tray occupancy changes are reported as captured-material counts.
     fn on_tray(&self, edge: TableEdge, event: &FieldEvent) -> Vec<InferenceOutput> {
         match event.kind {
-            FieldEventKind::FieldPlaced => vec![InferenceOutput::Zone(ZoneAction::TrayCount { edge, count: 1 })],
-            FieldEventKind::FieldLifted => vec![InferenceOutput::Zone(ZoneAction::TrayCount { edge, count: 0 })],
-            FieldEventKind::FieldCountChanged => vec![InferenceOutput::Zone(ZoneAction::TrayCount {
-                edge,
-                count: event.count.unwrap_or(0).max(0) as u32,
-            })],
+            FieldEventKind::FieldPlaced => vec![ZoneAction::TrayCount { edge, count: 1 }.into()],
+            FieldEventKind::FieldLifted => vec![ZoneAction::TrayCount { edge, count: 0 }.into()],
+            FieldEventKind::FieldCountChanged => vec![
+                ZoneAction::TrayCount {
+                    edge,
+                    count: event.count.unwrap_or(0).max(0) as u32,
+                }
+                .into(),
+            ],
             FieldEventKind::Lagged | FieldEventKind::Other => Vec::new(),
         }
     }
@@ -246,6 +285,7 @@ mod tests {
     use tangibles_chess_moves::MoveRequest;
 
     use super::MoveInference;
+    use crate::Anomaly;
     use crate::BoardGeometry;
     use crate::FieldEvent;
     use crate::FieldEventKind;
@@ -362,15 +402,81 @@ mod tests {
         let position = Chess::default();
         inference.on_event(&event(FieldEventKind::FieldLifted, &field_of(&geometry, Square::E2)), &position);
         let out = inference.on_event(&event(FieldEventKind::FieldPlaced, &field_of(&geometry, Square::E4)), &position);
-        // Intent is emitted once (for display/commit handling) and stays
-        // buffered until the zone press re-emits it.
-        assert_eq!(out.len(), 1);
+        // Strict mode defers the commit: placement only displays the
+        // pending intent; the mover's zone press re-emits it as the
+        // confirmed `MoveIntent`.
+        assert_eq!(out, vec![InferenceOutput::PendingIntent(MoveRequest::new(Square::E2, Square::E4))]);
         let out = inference.on_event(&event(FieldEventKind::FieldPlaced, "btn-south"), &position);
         assert_eq!(
             out,
             vec![
                 InferenceOutput::Zone(ZoneAction::ConfirmMove { edge: TableEdge::South }),
                 InferenceOutput::MoveIntent(MoveRequest::new(Square::E2, Square::E4))
+            ]
+        );
+    }
+
+    #[test]
+    fn confirm_zone_wrong_edge_is_anomaly() {
+        let geometry = BoardGeometry::tabletop();
+        let mut inference = MoveInference::new(geometry, CommitMode::OnConfirmZone);
+        let position = Chess::default();
+        inference.on_event(&event(FieldEventKind::FieldLifted, &field_of(&geometry, Square::E2)), &position);
+        inference.on_event(&event(FieldEventKind::FieldPlaced, &field_of(&geometry, Square::E4)), &position);
+        // The opponent's edge does not commit - the intent stays pending.
+        let out = inference.on_event(&event(FieldEventKind::FieldPlaced, "btn-north"), &position);
+        assert_eq!(
+            out,
+            vec![
+                InferenceOutput::Zone(ZoneAction::ConfirmMove { edge: TableEdge::North }),
+                InferenceOutput::Anomaly(Anomaly::ConfirmWrongEdge)
+            ]
+        );
+        let out = inference.on_event(&event(FieldEventKind::FieldPlaced, "btn-south"), &position);
+        assert_eq!(
+            out,
+            vec![
+                InferenceOutput::Zone(ZoneAction::ConfirmMove { edge: TableEdge::South }),
+                InferenceOutput::MoveIntent(MoveRequest::new(Square::E2, Square::E4))
+            ]
+        );
+    }
+
+    #[test]
+    fn confirm_zone_stray_press_is_anomaly() {
+        let geometry = BoardGeometry::tabletop();
+        let mut inference = MoveInference::new(geometry, CommitMode::OnConfirmZone);
+        let position = Chess::default();
+        let out = inference.on_event(&event(FieldEventKind::FieldPlaced, "btn-south"), &position);
+        assert_eq!(
+            out,
+            vec![
+                InferenceOutput::Zone(ZoneAction::ConfirmMove { edge: TableEdge::South }),
+                InferenceOutput::Anomaly(Anomaly::ConfirmWithoutPending)
+            ]
+        );
+    }
+
+    #[test]
+    fn takeback_lift_cancels_pending() {
+        let geometry = BoardGeometry::tabletop();
+        let mut inference = MoveInference::new(geometry, CommitMode::OnConfirmZone);
+        let position = Chess::default();
+        inference.on_event(&event(FieldEventKind::FieldLifted, &field_of(&geometry, Square::E2)), &position);
+        inference.on_event(&event(FieldEventKind::FieldPlaced, &field_of(&geometry, Square::E4)), &position);
+        // Lifting the just-placed marker back off cancels the intent.
+        let out = inference.on_event(&event(FieldEventKind::FieldLifted, &field_of(&geometry, Square::E4)), &position);
+        assert_eq!(out, vec![InferenceOutput::Cancelled]);
+        // Landing it back on the origin restores the board quietly.
+        let out = inference.on_event(&event(FieldEventKind::FieldPlaced, &field_of(&geometry, Square::E2)), &position);
+        assert_eq!(out, Vec::<InferenceOutput>::new());
+        // Nothing is pending anymore.
+        let out = inference.on_event(&event(FieldEventKind::FieldPlaced, "btn-south"), &position);
+        assert_eq!(
+            out,
+            vec![
+                InferenceOutput::Zone(ZoneAction::ConfirmMove { edge: TableEdge::South }),
+                InferenceOutput::Anomaly(Anomaly::ConfirmWithoutPending)
             ]
         );
     }

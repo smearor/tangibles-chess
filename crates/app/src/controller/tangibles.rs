@@ -297,13 +297,23 @@ impl GameController {
         for output in self.inference.on_event(&event, &position) {
             match output {
                 InferenceOutput::MoveIntent(request) => {
-                    self.screen.surface.scene.update(|s| s.lifted = None);
+                    self.screen.surface.scene.update(|s| {
+                        s.lifted = None;
+                        s.pending = None;
+                    });
                     self.apply_request(request);
+                }
+                InferenceOutput::PendingIntent(request) => {
+                    // Display-only intent: the destination glows and the
+                    // mover's status line asks for the zone press.
+                    self.screen.surface.scene.update(|s| s.pending = Some(request.to));
+                    self.screen.set_instruction(self.session.turn(), &self.l10n.msg("confirm-pending"));
                 }
                 InferenceOutput::Cancelled => {
                     self.screen.surface.scene.update(|s| {
                         s.lifted = None;
                         s.legal_targets.clear();
+                        s.pending = None;
                     });
                 }
                 InferenceOutput::Zone(ZoneAction::ConfirmMove { .. }) => {}

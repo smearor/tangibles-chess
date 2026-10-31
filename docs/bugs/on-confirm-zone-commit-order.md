@@ -1,7 +1,12 @@
 # Bug: `CommitMode::OnConfirmZone` commits on place and punishes the confirm press
 
 - **Requirement:** FR-TAN-11 (strict commit mode: pending until the mover's `btn-*` zone reports a placed contact)
-- **Status:** open — documented 2026-10-29, not yet fixed
+- **Status:** fixed — `commit()` emits `PendingIntent` instead of `MoveIntent`
+  in `OnConfirmZone`; only the mover's `btn-{edge}` press completes the
+  intent (`ConfirmWrongEdge`/`ConfirmWithoutPending` anomalies otherwise);
+  lifting the pending destination cancels via `Cancelled` + `takeback`
+  restore; UI shows a destination highlight + "press your button" status
+  line
 - **Severity:** feature broken; strict mode is selectable in the setup screen but behaves worse than `OnPlace`
 
 ## Observed behaviour

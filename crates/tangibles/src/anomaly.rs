@@ -23,6 +23,27 @@ pub enum Anomaly {
     PlacedOnOwnPiece,
     /// More than one contact rests on a single square.
     StackedContacts,
+    /// A `btn-*` press on the non-mover's edge while an intent is
+    /// pending - only the mover's edge completes a commit.
+    ConfirmWrongEdge,
+    /// A `btn-*` press with no pending intent to confirm.
+    ConfirmWithoutPending,
+}
+
+impl Anomaly {
+    /// All anomaly kinds, for exhaustive iteration (tests).
+    pub const ALL: [Self; 10] = [
+        Self::CaptureWithoutAir,
+        Self::LiftOnEmptySquare,
+        Self::TwoPiecesLifted,
+        Self::NonMovingSideLifted,
+        Self::RookOffCastlingTarget,
+        Self::PlaceWithoutLift,
+        Self::PlacedOnOwnPiece,
+        Self::StackedContacts,
+        Self::ConfirmWrongEdge,
+        Self::ConfirmWithoutPending,
+    ];
 }
 
 impl std::fmt::Display for Anomaly {
@@ -36,6 +57,8 @@ impl std::fmt::Display for Anomaly {
             Self::PlaceWithoutLift => "marker placed without a lift",
             Self::PlacedOnOwnPiece => "marker placed on own piece",
             Self::StackedContacts => "multiple contacts stacked on one square",
+            Self::ConfirmWrongEdge => "confirm pressed on the non-mover's edge",
+            Self::ConfirmWithoutPending => "confirm pressed with nothing pending",
         };
         f.write_str(detail)
     }
@@ -47,16 +70,7 @@ mod tests {
 
     #[test]
     fn every_variant_has_a_detail_message() {
-        for anomaly in [
-            Anomaly::CaptureWithoutAir,
-            Anomaly::LiftOnEmptySquare,
-            Anomaly::TwoPiecesLifted,
-            Anomaly::NonMovingSideLifted,
-            Anomaly::RookOffCastlingTarget,
-            Anomaly::PlaceWithoutLift,
-            Anomaly::PlacedOnOwnPiece,
-            Anomaly::StackedContacts,
-        ] {
+        for anomaly in Anomaly::ALL {
             assert!(!anomaly.to_string().is_empty());
         }
     }
