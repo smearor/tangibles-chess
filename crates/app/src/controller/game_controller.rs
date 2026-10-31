@@ -60,6 +60,9 @@ pub struct GameController {
     pub(super) pending_promotion: Option<MoveRequest>,
     /// The promotion picker overlay widget (to remove on pick).
     pub(super) promotion_widget: RefCell<Option<Widget>>,
+    /// The draw-offer/resign-confirm overlay widget (to remove on
+    /// answer).
+    pub(super) action_prompt: RefCell<Option<Widget>>,
     /// Last applied move's squares for the highlight trace.
     pub(super) last_move: Option<(Square, Square)>,
     /// Board rectangle in screen mm for the registered field set.
@@ -115,6 +118,7 @@ impl GameController {
             selected: None,
             pending_promotion: None,
             promotion_widget: RefCell::new(None),
+            action_prompt: RefCell::new(None),
             last_move: None,
             board_mm: BoardRectMm::default(),
             window_mm: SurfaceMm::default(),

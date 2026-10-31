@@ -25,16 +25,16 @@ protocol breaks) from stray zone presses; the controller now calls
 `resync_occupancy()` on the former, so the physical board re-establishes
 truth instead of cascading anomalies off stale in-air state.
 
-## 3. Draw offer / resign confirmation flows (FR-UI-6, FR-CORE-5)
+## 3. Draw offer / resign confirmation flows (FR-UI-6, FR-CORE-5) ✅
 
-Both actions currently take effect on a single click — one side can
-unilaterally draw or instantly resign.
-
-- Draw: offer → the opponent's edge shows an accept/decline prompt
-  facing them
-- Resign: confirmation dialog facing the requester
-- Reuse the `PromotionPicker` pattern (`RotationWidget` wrapper for
-  the north edge)
+Draw is now a two-step handshake: the draw button records
+`GameSession::offer_draw(side)` and shows a `ConfirmCard` facing the
+**opponent's** edge - `accept_draw` finishes the game, `decline_draw`
+flashes "draw declined" back to the offerer. Resign shows the same
+card facing the requester before `session.resign` runs. `ConfirmCard`
+reuses the `PromotionPicker` overlay pattern (`RotationWidget` for the
+north edge); played moves lapse an open offer (FIDE convention); the
+MCP `resign`/`agree_draw` tools keep their direct, immediate semantics.
 
 ## 4. Guided undo on the board (FR-CORE-6)
 

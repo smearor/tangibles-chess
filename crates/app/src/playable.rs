@@ -16,9 +16,11 @@ pub trait Playable {
     /// to the UI. Returns the session's outcome for remote callers.
     fn apply_request(&mut self, request: MoveRequest) -> MoveOutcome;
 
-    /// `side` resigns.
-    fn resign(&mut self, side: Side);
+    /// `side` requests resignation; a confirmation card faces `side`'s
+    /// edge before the resign takes effect.
+    fn request_resign(&mut self, side: Side);
 
-    /// Agrees a draw.
-    fn draw(&mut self);
+    /// `side` offers a draw; the opponent's edge gets the
+    /// accept/decline card.
+    fn offer_draw(&mut self, side: Side);
 }

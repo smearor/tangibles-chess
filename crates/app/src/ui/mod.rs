@@ -3,6 +3,7 @@
 pub mod app_window;
 pub mod cap_cell;
 pub mod chess_scene;
+pub mod confirm_card;
 pub mod dual_facing_row;
 pub mod game_result;
 pub mod game_screen;

@@ -109,7 +109,8 @@
     font-weight: bold;
 }
 
-.promotion-card {
+.promotion-card,
+.confirm-card {
     background: alpha(@card_bg_color, 0.88);
     border-radius: 20px;
     padding: 32px 48px;
@@ -117,8 +118,9 @@
 }
 
 /* Solid background so the piece buttons stay readable on the
-   translucent promotion card. */
-.promotion-choice {
+   translucent overlay cards. */
+.promotion-choice,
+.confirm-choice {
     padding: 12px;
     border-radius: 12px;
     background: @window_bg_color;

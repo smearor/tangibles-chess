@@ -19,6 +19,7 @@ use super::registry::with_controller;
 use crate::playable::Playable;
 use crate::ui::chess_scene::FlashRole;
 use crate::ui::chess_scene::IllegalFlash;
+use crate::ui::confirm_card::ConfirmCard;
 use crate::ui::game_result::GameResult;
 use crate::ui::promotion_picker::PromotionPicker;
 
@@ -207,6 +208,73 @@ impl GameController {
         );
         self.screen.push_overlay(&picker.widget);
         *self.promotion_widget.borrow_mut() = Some(picker.widget.clone());
+    }
+
+    /// Removes the open draw-offer/resign-confirm card, if any.
+    pub(super) fn pop_action_prompt(&self) {
+        if let Some(widget) = self.action_prompt.borrow_mut().take() {
+            self.screen.pop_overlay(&widget);
+        }
+    }
+
+    /// Shows the draw offer's accept card facing `offerer`'s opponent.
+    pub(super) fn show_draw_offer(&self, offerer: Side) {
+        let responder = offerer.other();
+        let facing_north = self.geometry.side_edge(responder) == TableEdge::North;
+        let mut args = FluentArgs::new();
+        args.set("side", self.l10n.msg(offerer.l10n_key()));
+        let heading = self.l10n.msg_args("game-draw-offer-prompt", &args);
+        let card = ConfirmCard::new(
+            &heading,
+            &self.l10n.msg("game-accept"),
+            &self.l10n.msg("game-decline"),
+            facing_north,
+            move || {
+                with_controller(|controller| {
+                    let mut controller = controller.borrow_mut();
+                    controller.session.accept_draw();
+                    controller.pop_action_prompt();
+                    controller.sync_scene();
+                    controller.show_result();
+                });
+            },
+            move || {
+                with_controller(|controller| {
+                    let mut controller = controller.borrow_mut();
+                    controller.session.decline_draw();
+                    controller.screen.show_message_for(offerer, &controller.l10n.msg("game-draw-declined"));
+                    controller.pop_action_prompt();
+                    controller.sync_scene();
+                });
+            },
+        );
+        self.screen.push_overlay(&card.widget);
+        *self.action_prompt.borrow_mut() = Some(card.widget.clone());
+    }
+
+    /// Shows the resign confirmation facing `side`'s own edge.
+    pub(super) fn show_resign_confirm(&self, side: Side) {
+        let facing_north = self.geometry.side_edge(side) == TableEdge::North;
+        let card = ConfirmCard::new(
+            &self.l10n.msg("game-resign-prompt"),
+            &self.l10n.msg("game-resign"),
+            &self.l10n.msg("game-cancel"),
+            facing_north,
+            move || {
+                with_controller(|controller| {
+                    let mut controller = controller.borrow_mut();
+                    controller.session.resign(side);
+                    controller.pop_action_prompt();
+                    controller.sync_scene();
+                    controller.show_result();
+                });
+            },
+            move || {
+                with_controller(|controller| controller.borrow_mut().pop_action_prompt());
+            },
+        );
+        self.screen.push_overlay(&card.widget);
+        *self.action_prompt.borrow_mut() = Some(card.widget.clone());
     }
 
     /// Applies the setup options that are safe to change mid-game

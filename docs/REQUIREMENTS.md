@@ -86,9 +86,9 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   insufficient material, 50-move rule, threefold repetition (via
   Zobrist history), plus agreed draw and resignation. ✅
 - **FR-CORE-5** Draw agreement between two human players; claimable
-  draws surfaced to the UI. 🟡 — implemented as single-click
-  `agree_draw` (either side can draw instantly); a real offer/accept
-  handshake between the two panels is still missing (FR-UI-6)
+  draws surfaced to the UI. ✅ — `offer_draw`/`accept_draw`/
+  `decline_draw` offer state in the session, accept card faces the
+  opponent; offers lapse on the next played move
 - **FR-CORE-6** `UndoPlan` computes the *physical* rebuild steps for a
   takeback (move-back list, captured-piece re-placement, castling rook,
   promotion reversal) so tangible undo can be guided on the board. ✅ core
@@ -199,9 +199,9 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   desktop chrome (fullscreen). ✅ baseline 🟡 visual polish
 - **FR-UI-6** Dialog orientation: promotion picker faces the moving
   player; draw offers face the opponent; resign confirmations face
-  the requester. 🟡 — promotion picker ✅ (rotated toward the mover's
-  edge); draw offer/accept flow and resign confirmation ⬜ (both
-  actions currently take effect on a single click)
+  the requester. ✅ — promotion picker faces the mover; draw offers
+  show an accept/decline card on the opponent's edge; resign shows a
+  confirmation card on the requester's edge (`ConfirmCard`)
 
 ### 6.2 Widgets
 

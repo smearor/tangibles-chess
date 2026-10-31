@@ -38,8 +38,8 @@ pub struct PanelActions {
     pub on_undo: Option<Rc<dyn Fn()>>,
     /// Redo request.
     pub on_redo: Option<Rc<dyn Fn()>>,
-    /// Draw offer/claim.
-    pub on_draw: Option<Rc<dyn Fn()>>,
+    /// Draw offer from the panel's side.
+    pub on_draw: Option<Rc<dyn Fn(Side)>>,
     /// Resign for the panel's side.
     pub on_resign: Option<Rc<dyn Fn(Side)>>,
     /// Rotate-clockwise request (only used on the shared toolbar).
@@ -82,7 +82,7 @@ impl PlayerPanel {
         let draw = Self::control_button(icon_names::TCH_HANDSHAKE_SYMBOLIC, &l10n.msg("game-offer-draw"));
         if let Some(on_draw) = &actions.on_draw {
             let on_draw = on_draw.clone();
-            draw.connect_clicked(move |_| on_draw());
+            draw.connect_clicked(move |_| on_draw(side));
         }
         let resign = Self::control_button(icon_names::TCH_FLAG_SYMBOLIC, &l10n.msg("game-resign"));
         if let Some(on_resign) = &actions.on_resign {

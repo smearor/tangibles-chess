@@ -110,23 +110,22 @@ impl Playable for GameController {
         outcome
     }
 
-    /// Resign for `side`.
-    fn resign(&mut self, side: Side) {
-        if self.replay_index.is_some() {
+    /// Resign confirmation for `side` (the actual resign happens on
+    /// the card's confirm button).
+    fn request_resign(&mut self, side: Side) {
+        if self.replay_index.is_some() || self.action_prompt.borrow().is_some() {
             return;
         }
-        self.session.resign(side);
-        self.sync_scene();
-        self.show_result();
+        self.show_resign_confirm(side);
     }
 
-    /// Agree a draw.
-    fn draw(&mut self) {
-        if self.replay_index.is_some() {
+    /// Draw offer from `side` (accepted or declined on the opponent's
+    /// edge).
+    fn offer_draw(&mut self, side: Side) {
+        if self.replay_index.is_some() || self.action_prompt.borrow().is_some() || self.session.draw_offer().is_some() {
             return;
         }
-        self.session.agree_draw();
-        self.sync_scene();
-        self.show_result();
+        self.session.offer_draw(side);
+        self.show_draw_offer(side);
     }
 }

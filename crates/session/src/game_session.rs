@@ -53,6 +53,8 @@ pub struct GameSession {
     resigned: Option<Side>,
     /// Both players agreed a draw.
     agreed_draw: bool,
+    /// Side whose draw offer still awaits the opponent's answer.
+    draw_offer: Option<Side>,
 }
 
 impl GameSession {
@@ -70,6 +72,7 @@ impl GameSession {
             ucis: Vec::new(),
             resigned: None,
             agreed_draw: false,
+            draw_offer: None,
         }
     }
 
@@ -218,6 +221,9 @@ impl GameSession {
                 self.hashes.push(next.zobrist_hash::<Zobrist64>(EnPassantMode::Legal));
                 self.sans.push(san.clone());
                 self.ucis.push(Uci::from_move(&mv));
+                // A played move answers any open draw offer (FIDE:
+                // the offer lapses once the opponent moves).
+                self.draw_offer = None;
                 self.finish_if_terminal();
                 MoveOutcome::Applied(san)
             }
@@ -355,6 +361,33 @@ impl GameSession {
         self.phase = GamePhase::Finished;
     }
 
+    /// Records a draw offer from `side`; stays pending until the
+    /// opponent accepts, declines, or a move is played.
+    pub fn offer_draw(&mut self, side: Side) {
+        self.draw_offer = Some(side);
+    }
+
+    /// The side whose draw offer is still open, if any.
+    pub fn draw_offer(&self) -> Option<Side> {
+        self.draw_offer
+    }
+
+    /// The opponent accepts the pending offer: the game is drawn by
+    /// agreement. Returns whether an offer was pending.
+    pub fn accept_draw(&mut self) -> bool {
+        if self.draw_offer.take().is_some() {
+            self.agreed_draw = true;
+            self.phase = GamePhase::Finished;
+            return true;
+        }
+        false
+    }
+
+    /// The opponent declines the pending offer.
+    pub fn decline_draw(&mut self) {
+        self.draw_offer = None;
+    }
+
     /// Marks a finished game (terminal outcome reached on the board).
     pub fn finish_if_terminal(&mut self) {
         if self.phase == GamePhase::InProgress && self.outcome().is_some() {
@@ -410,6 +443,7 @@ mod tests {
     use shakmaty::Square;
 
     use super::GameSession;
+    use crate::DrawReason;
     use tangibles_chess_config::GameConfig;
     use tangibles_chess_config::TangibleMode;
     use tangibles_chess_material::Role;
@@ -614,6 +648,37 @@ mod tests {
         session.resign(Side::Black);
         assert_eq!(session.phase(), GamePhase::Finished);
         assert!(session.outcome().is_some());
+    }
+
+    #[test]
+    fn draw_offer_accept_draws() {
+        let mut session = session();
+        session.offer_draw(Side::White);
+        assert_eq!(session.draw_offer(), Some(Side::White));
+        assert!(session.accept_draw());
+        assert_eq!(session.draw_offer(), None);
+        assert_eq!(session.phase(), GamePhase::Finished);
+        assert!(matches!(session.draw_reason(), Some(DrawReason::Agreement)));
+    }
+
+    #[test]
+    fn draw_offer_decline_keeps_playing() {
+        let mut session = session();
+        session.offer_draw(Side::Black);
+        session.decline_draw();
+        assert_eq!(session.draw_offer(), None);
+        assert_eq!(session.phase(), GamePhase::InProgress);
+        assert!(!session.accept_draw());
+    }
+
+    #[test]
+    fn draw_offer_lapses_on_move() {
+        let mut session = session();
+        session.offer_draw(Side::White);
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        // The opponent's move answers the offer - nothing left pending.
+        assert_eq!(session.draw_offer(), None);
+        assert!(!session.accept_draw());
     }
 
     #[test]
