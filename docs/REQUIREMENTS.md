@@ -15,7 +15,7 @@ presentation.
 This document is the normative requirements baseline. Requirement IDs
 (`FR-*`, `NFR-*`, `IF-*`, `ARCH-*`, `X-*`) are stable — code, tests and
 docs should reference them. Status markers: ✅ done, 🟡 partial,
-⬜ open, 🔮 future (explicitly out of scope).
+⬜ open, 🐛 implemented but defective, 🔮 future (explicitly out of scope).
 
 ---
 
@@ -45,9 +45,12 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   chess square — `BoardGeometry` maps index→square under the current
   orientation.
 - **Zones**: non-board fields `btn-south`, `btn-north` (confirm),
-  `tray-south`, `tray-north` (captured pieces).
-- **Handshake**: the mandatory physical-placement phase before a
-  tangible game starts.
+  `tray-south`, `tray-north` (captured-piece count), plus the parking
+  strips `cap-west-0..7` and `cap-east-0..7` (per-cell occupancy for
+  the rendered captured pieces beside the board).
+- **Handshake**: the physical-placement phase before a tangible game
+  starts — on by default, can be disabled via `require_placement`
+  (debug aid for incomplete physical setups).
 - **South/North**: the two table edges; each player "owns" one edge.
 - **Wire mirror / projection**: this app's local domain types fed from
   upstream model types via `From` conversions (see ARCH-4).
@@ -59,7 +62,8 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   Promotion is signalled via badge/picker UI. ✅
 - **FR-MODE-2** `TangiblesRendered`: same input, plus rendered digital
   pieces as a control/overlay; physical↔logical discrepancies are
-  visualized (anomaly state). ✅ render 🟡 discrepancy UI
+  visualized (anomaly state). ✅ persistent discrepancy rings via
+  `update_discrepancy`
 - **FR-MODE-3** `NoTangibles`: pure touch chess with rendered pieces;
   no daemon needed; always available (must work daemon-less). ✅
 - **FR-MODE-4** Mode selection happens on the setup screen and applies
@@ -82,10 +86,14 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   insufficient material, 50-move rule, threefold repetition (via
   Zobrist history), plus agreed draw and resignation. ✅
 - **FR-CORE-5** Draw agreement between two human players; claimable
-  draws surfaced to the UI. ✅
+  draws surfaced to the UI. 🟡 — implemented as single-click
+  `agree_draw` (either side can draw instantly); a real offer/accept
+  handshake between the two panels is still missing (FR-UI-6)
 - **FR-CORE-6** `UndoPlan` computes the *physical* rebuild steps for a
   takeback (move-back list, captured-piece re-placement, castling rook,
-  promotion reversal) so tangible undo can be guided on the board. ✅ core 🟡 guided UI
+  promotion reversal) so tangible undo can be guided on the board. ✅ core
+  ⬜ guided UI — the plan is currently only `debug!`-logged; undo/redo
+  buttons work logically but give the player no physical guidance
 - **FR-CORE-7** `SavedGame` (TOML) persists FEN-replayable move list +
   config + end state after every move (autosave). ✅
 - **FR-CORE-8** Resume: a saved game can be rebuilt
@@ -109,7 +117,8 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   and `Lifetime::Session`; unregistered on cleanup. ✅
 - **FR-TAN-4** Geometry: `FieldSetBuilder` emits 64 board cells
   (absolute screen-mm rects from device calibration + rendered board
-  rect) + 4 zones; the set must satisfy `FieldSet::is_disjoint()` (the
+  rect) + zones (`btn-*`, `tray-*`, and `cap-*` parking cells where the
+  surface has room); the set must satisfy `FieldSet::is_disjoint()` (the
   daemon rejects overlapping fields — enforced in tests). ✅
 - **FR-TAN-5** `deviceInfo` supplies mm-per-pixel calibration; missing
   data degrades gracefully to estimated geometry. ✅
@@ -130,28 +139,41 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   request; UI shows the picker toward the promoting player. ✅
 - **FR-TAN-11** `CommitMode::OnPlace` (casual: move commits on place)
   vs `CommitMode::OnConfirmZone` (strict: pending until the mover's
-  `btn-*` zone reports a placed contact — clock-puck style). ✅ inference 🟡 UX
-- **FR-TAN-12** Tray zones (`tray-*`) count captured pieces per side. 🟡
+  `btn-*` zone reports a placed contact — clock-puck style). ✅ inference 🐛 UX —
+  the controller applies the display intent immediately; see
+  `docs/bugs/on-confirm-zone-commit-order.md`
+- **FR-TAN-12** Tray zones (`tray-*`) count captured pieces per side;
+  `cap-*` parking cells track occupancy and render the captured pieces
+  beside the board. ✅
 - **FR-TAN-13** Anomalies (unexpected lift/place, extra contact, foreign
   field) produce `InferenceOutput::Anomaly` events, surface in the UI
   and trigger occupancy resync; the game must never silently corrupt
-  board state. 🟡 recovery UX
+  board state. ✅ events + status-line surfacing ⬜ anomaly-triggered
+  resync + recovery UX (resync currently only on `LAGGED`)
 - **FR-TAN-14** `LAGGED` subscription events and stream errors force a
-  `touchPoints` resync — the physical board is source of truth. ✅ logic 🟡 UX
+  `touchPoints` resync — the physical board is source of truth. ✅
+  (stream errors are translated into `Lagged` events; parking strips
+  resync from raw touches too)
 - **FR-TAN-15** `BoardGeometry` permutes field index→square under
   0/90/180/270° orientations; white/black edges tracked independently. ✅
 
-### 5.3 Start handshake (mandatory)
+### 5.3 Start handshake (mandatory by default)
 
 - **FR-TAN-16** Tangible games cannot start until physical placement
   matches the expected position (initial or resumed):
   `GamePhase::AwaitingPlacement` + `PlacementGate` comparing
-  `OccupancyProbe` against `shakmaty` board. ✅
+  `OccupancyProbe` against `shakmaty` board. ✅ — the gate can be
+  disabled per game via `GameConfig::require_placement` (debug aid for
+  incomplete physical setups)
 - **FR-TAN-17** Handshake UI: dual-facing overlay, progress "n/32",
   missing + foreign-occupied fields highlighted on the board; fields
-  light up when filled correctly (setup ceremony). ✅ basic 🟡 ceremony polish
+  light up when filled correctly (setup ceremony). ✅ — implemented as
+  per-side status lines (own `placed/total` + first missing/foreign
+  hint), missing/foreign markers and ceremony lighting on the scene
 - **FR-TAN-18** Placement check remains armed after the handshake as
-  the anomaly trigger. ✅
+  the anomaly trigger. 🟡 — during play the `MoveInference` anomaly
+  stream covers this; a persistent physical↔logical comparison exists
+  only in `TangiblesRendered` (discrepancy rings, FR-MODE-2)
 
 ## 6. Tabletop UI (crate `tangibles-chess`, GTK4 + libadwaita)
 
@@ -175,7 +197,9 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   desktop chrome (fullscreen). ✅ baseline 🟡 visual polish
 - **FR-UI-6** Dialog orientation: promotion picker faces the moving
   player; draw offers face the opponent; resign confirmations face
-  the requester. 🟡
+  the requester. 🟡 — promotion picker ✅ (rotated toward the mover's
+  edge); draw offer/accept flow and resign confirmation ⬜ (both
+  actions currently take effect on a single click)
 
 ### 6.2 Widgets
 
@@ -185,32 +209,47 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   states, missing/foreign markers, optional piece glyphs. ✅
 - **FR-UI-8** Player panels on both edges: name/color, turn indicator,
   clock placeholder (M3), captured-material tray display, action
-  buttons (resign, draw, undo, rotate) with icon-set icons. ✅ baseline 🟡 trays/clocks
+  buttons (resign, draw, undo, rotate) with icon-set icons. ✅ — tray
+  count label + `cap-*` parking strips render captured pieces;
+  ⬜ clock placeholder
 - **FR-UI-9** **Score sheets** on both long edges, each upright to its
-  player (notation in SAN). ✅
+  player (notation in SAN); clicking a ply seeks the replay cursor in
+  finished games. ✅
 - **FR-UI-10** Setup screen: mode/theme/orientation/commit/opponent/
   sound controls + big start button, dual-facing; resume card when an
-  autosave exists (with move count). ✅
+  autosave exists (with move count). ✅ — also `require_placement`
+  and `allow_undo` toggles; engine opponent shown greyed-out (M3)
 - **FR-UI-11** Daemon status: setup probes the endpoint (GraphQL
   `__typename` ping); tangible mode pickers grey out when the daemon
   is unreachable. ✅
-- **FR-UI-12** Handshake overlay (FR-TAN-17). ✅ baseline
+- **FR-UI-12** Handshake overlay (FR-TAN-17). ✅
 - **FR-UI-13** `DiagnosticsOverlay`: live per-field contact counts +
   raw touch points for calibration/hardware bring-up. ⬜ M2
+- **FR-UI-14** Replay mode for finished games: the result overlay
+  offers a replay entry that steps through the recorded plies —
+  score-sheet clicks seek, undo/redo buttons walk the cursor, physical
+  board events feed only the discrepancy display while replaying. ✅
+  (added beyond the original scope)
 
 ### 6.3 Artistic direction — "edles, intelligentes, rustikales Schach"
 
 - **FR-ART-1** *Licht unter den Figuren* (signature feature): lifting a
   physical piece dims its origin and makes legal targets glow beneath
   the piece in hand; check = warm red under the king; last-move light
-  trail; calm fades, no bouncy animation. 🟡 first pass
+  trail; calm fades, no bouncy animation. ✅ baseline — lifted-square +
+  legal-target glow on `FIELD_LIFTED`, check highlight, last-move
+  trail and illegal-move flash with check projection implemented
 - **FR-ART-2** Material themes `BoardTheme { WalnutMaple, Slate,
   TournamentGreen }` — wood-inlay look, engraved-edge coordinates,
   serif clocks, leather/wood panels; selectable + persisted. ✅ 3 themes
 - **FR-ART-3** Score sheet styled like a physical scoresheet; captured
-  trays double as physical zones (FR-TAN-12). 🟡
+  trays double as physical zones (FR-TAN-12). ✅ — parking strips hold
+  the physical captured pieces next to their rendered counterparts
 - **FR-ART-4** Sound character: soft wooden knock on place, deeper
-  strike on capture; distinct check/promotion/game-end/error cues. ⬜ M3 (abstraction exists)
+  strike on capture; distinct check/promotion/game-end/error cues. ⬜ M3 —
+  `SoundPlayer` honors the persisted flag and degrades to no-op, but
+  `assets/sounds/` is empty and `SoundEffect` covers only
+  move/capture/check/end (castle, promotion, error cues missing)
 
 ## 7. Icons & Pieces
 
@@ -231,7 +270,9 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
 - **FR-I18N-2** `--locale` flag overrides system locale. ✅
 - **FR-SND-1** `SoundPlayer` abstraction honoring a persisted
   sound-enabled flag; event hooks for move/capture/castle/check/
-  promotion/end/error. 🟡 abstraction ✅ toggle (assets in M3)
+  promotion/end/error. 🟡 — player + persisted toggle ✅; hooks wired
+  for move/capture/check/end; ⬜ castle/promotion/error cues +
+  `assets/sounds/*.ogg` (FR-ART-4)
 
 ## 9. Persistence & CLI
 
@@ -239,24 +280,30 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   after every move; corrupted/absent files never block startup. ✅
 - **FR-PER-2** `AppSettings` (TOML, config dir): last config,
   daemon URL, sound flag, theme. ✅
-- **FR-CLI-1** Flags: `--daemon-url`, `--locale`, `--mock`. ✅
+- **FR-CLI-1** Flags: `--daemon-url`, `--locale`, `--mock`, plus
+  `--mcp-listen` (game-domain MCP endpoint, see X-1). ✅
 
 ## 10. Engine, Clocks, PGN (M3)
 
 - **FR-ENG-1** AI opponent via external **UCI engine subprocess**
   (`tangibles-chess-engine`: spawn/uci/position/go/bestmove, run off
-  the GTK thread). 🟡 client skeleton ⬜ gameplay wiring
+  the GTK thread). 🟡 — `EngineClient` + `OpponentKind::Engine` exist;
+  the setup picker shows the engine greyed-out; ⬜ gameplay wiring
 - **FR-ENG-2** Optional auto-rotation toward the active player in
   `NoTangibles`. ⬜
 - **FR-ENG-3** Chess clocks (increment/fixed), per-edge display. ⬜
-- **FR-ENG-4** PGN load/save (`pgn-reader` dep in place). ⬜
+- **FR-ENG-4** PGN load/save. ⬜ — `pgn-reader` is declared in the
+  workspace deps but not yet used by any crate
 
 ## 11. Architecture (ARCH-*)
 
 - **ARCH-1** Multi-crate Rust workspace, edition 2024, `rust-version
-  1.92`: `core` (domain, shakmaty) · `tangibles` (daemon adapter +
-  physical interpretation) · `engine` (UCI) · `icons` (generated icon
-  set) · `app` (GTK4/libadwaita). ✅
+  1.92`: `config` (setup enums + `GameConfig`) · `geometry` (orientation,
+  field/scene indices) · `notation` (`Fen`/`San`/`Uci`/`SquareName`
+  newtypes) · `core` (domain, shakmaty — re-exports the three above) ·
+  `tangibles` (daemon adapter + physical interpretation) · `engine`
+  (UCI) · `icons` (generated icon set) · `mcp` (game-domain MCP
+  endpoint, X-1) · `app` (GTK4/libadwaita). ✅
 - **ARCH-2** Domain layers have **no GTK deps**; the app owns the only
   main loop; daemon runtime = dedicated tokio runtime thread
   (`TangibleHost`), events hop back via `async_channel`. ✅
@@ -269,9 +316,10 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   with `From` conversions — deliberate isolation, not wire
   duplication. ✅
 - **ARCH-5** Internal `GameEvent`/`ControlCommand`-style channels stay
-  cleanly bounded so a future game-domain GraphQL/MCP service can
-  attach later — **designing for it is required, building it is
-  not**. ✅ boundaries
+  cleanly bounded so a game-domain service can attach. ✅ — realized:
+  `tangibles-chess-mcp` exposes the session via MCP over Streamable
+  HTTP (`--mcp-listen`); commands hop onto the GTK main loop through a
+  bounded channel (X-1)
 - **ARCH-6** Coding rules per `AGENTS.md`: panic-free, rustdoc on all
   public items + fields/variants, one type per file, individual sorted
   imports, `debug!` macro imports, thiserror/miette errors, inline
@@ -297,7 +345,7 @@ data MIT/Apache, Cuernavaca OFL — recorded in NOTICE).
 ## 13. Verification & Acceptance
 
 - **V-1** `cargo build/test/clippy --workspace` green, `cargo fmt
-  --check` clean. ✅ (42 tests)
+  --check` clean. ✅ (74 tests)
 - **V-2** `NoTangibles` playable end-to-end on desktop without daemon. ✅ baseline
 - **V-3** Manual tabletop checks: rotation 0/90/180/270°, touch
   accuracy, both-edge readability. ⬜
@@ -309,9 +357,13 @@ data MIT/Apache, Cuernavaca OFL — recorded in NOTICE).
 
 ## 14. Explicitly Out of Scope (X-*)
 
-- **X-1** Game-domain GraphQL/MCP service (remote players, agent
-  opponent, spectator stream, E2E automation) — *future enhancement*;
-  boundaries prepared per ARCH-5, nothing implemented.
+- **X-1** Game-domain service (remote players, agent opponent,
+  spectator stream, E2E automation) — **partially realized**: the
+  `tangibles-chess-mcp` crate exposes an opt-in MCP endpoint over
+  Streamable HTTP (`--mcp-listen`) with tools for game state, legal
+  moves, make-move, undo, resign, draw, placement status and window
+  screenshots plus a game-state subscription. Still out of scope:
+  remote/network play and agent-vs-agent games (X-4).
 - **X-2** Direct evdev/hardware access in the app — daemon only.
 - **X-3** Multi-pin marker patterns — one-contact markers only.
 - **X-4** Online/network play.
@@ -321,9 +373,12 @@ data MIT/Apache, Cuernavaca OFL — recorded in NOTICE).
 - **M1 ✅** workspace/infrastructure, core, `NoTangibles` app, rotation,
   dual-facing UI, setup (+resume/daemon probe), promotion, undo,
   score sheets, themes, i18n, icons.
-- **M2 🟡/⬜** tangible modes live (`--replay` → hardware), handshake
+- **M2 🟡** tangible modes live (`--replay` → hardware), handshake
   ceremony polish, light-guide refinement, guided undo, diagnostics
-  overlay, anomaly recovery UX, captured-tray display, owner-based
-  deregistration on mode change/exit.
-- **M3 ⬜** UCI engine wiring, clocks, PGN, sound assets, more themes,
-  auto-rotation, animation polish.
+  overlay, anomaly recovery UX, ~~captured-tray display~~,
+  ~~owner-based deregistration~~, `OnConfirmZone` commit fix
+  (`docs/bugs/on-confirm-zone-commit-order.md`), draw/resign
+  confirmation flows (FR-UI-6). Done since: replay mode, discrepancy
+  rings, parking strips, MCP endpoint (X-1).
+- **M3 ⬜** UCI engine wiring, clocks, PGN, sound assets + remaining
+  cues, more themes, auto-rotation, animation polish.
