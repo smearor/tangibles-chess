@@ -1,15 +1,16 @@
 //! Tangible backend lifecycle and field-event handling.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use gdk4::prelude::DisplayExt;
 use gdk4::prelude::MonitorExt;
 use gdk4::prelude::SurfaceExt;
+use glib::{ControlFlow, MainContext};
 use gtk4::prelude::NativeExt;
 use gtk4::prelude::WidgetExt;
 use shakmaty::Position;
 use shakmaty::Square;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
 use tangibles_chess_config::TangibleMode;
 use tangibles_chess_material::Side;
 use tangibles_chess_moves::GamePhase;
@@ -34,6 +35,7 @@ use tracing::warn;
 
 use super::game_controller::GameController;
 use super::source::Source;
+use crate::placement_issue::PlacementIssue;
 use crate::playable::Playable;
 use crate::tangible_host::TangibleHost;
 
@@ -61,7 +63,7 @@ impl GameController {
             let _ = tx.try_send(result);
         });
         let controller_weak = Rc::downgrade(&controller);
-        glib::MainContext::default().spawn_local(async move {
+        MainContext::default().spawn_local(async move {
             let Ok(result) = rx.recv().await else {
                 return;
             };
@@ -91,7 +93,7 @@ impl GameController {
     /// logs and gives up.
     pub(crate) fn register_when_ready(controller: Rc<RefCell<Self>>) {
         let mut tries = 0u8;
-        glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+        glib::timeout_add_local(Duration::from_millis(100), move || {
             tries += 1;
             // `board_rect()` answers `Some` even at a 1px allocation -
             // require a real size so the registered fields cover real
@@ -99,15 +101,15 @@ impl GameController {
             let ready = controller.borrow().screen.surface.scene.width() >= 100;
             if !ready {
                 return if tries < 50 {
-                    glib::ControlFlow::Continue
+                    ControlFlow::Continue
                 } else {
                     warn!("field set registration skipped: scene never realized");
-                    glib::ControlFlow::Break
+                    ControlFlow::Break
                 };
             }
             let mut controller_ref = controller.borrow_mut();
             let Some(Source::Daemon(source)) = &controller_ref.source else {
-                return glib::ControlFlow::Break;
+                return ControlFlow::Break;
             };
             let source = source.clone();
             let spec = controller_ref.build_field_set(&source);
@@ -125,7 +127,7 @@ impl GameController {
                 Some(Err(err)) => warn!("field set registration failed: {err}"),
                 None => warn!("field set registration skipped: no tangible host"),
             }
-            glib::ControlFlow::Break
+            ControlFlow::Break
         });
     }
 
@@ -138,7 +140,7 @@ impl GameController {
     /// Drains the field-event channel into the controller on the main
     /// loop.
     fn start_event_pump(controller: Rc<RefCell<Self>>, events: async_channel::Receiver<FieldEvent>) {
-        glib::MainContext::default().spawn_local(async move {
+        MainContext::default().spawn_local(async move {
             while let Ok(event) = events.recv().await {
                 controller.borrow_mut().on_field_event(event);
             }
@@ -241,11 +243,15 @@ impl GameController {
             return self.l10n.msg("check-ready").to_string();
         }
         let mut parts = vec![format!("{placed}/{}", placed + own_missing.len())];
-        for (key, square) in [("check-missing", own_missing.first()), ("check-unexpected", status.unexpected.first())] {
+        let issues = [
+            (PlacementIssue::Missing, own_missing.first()),
+            (PlacementIssue::Unexpected, status.unexpected.first()),
+        ];
+        for (issue, square) in issues {
             if let Some(square) = square {
                 let mut args = fluent::FluentArgs::new();
                 args.set("square", square.to_string());
-                parts.push(self.l10n.msg_args(key, &args).to_string());
+                parts.push(self.l10n.msg_args(issue.l10n_key(), &args).to_string());
             }
         }
         parts.join(" - ")
@@ -382,7 +388,7 @@ impl GameController {
                 }
             },
             (_, Some(Source::Mock(mock))) => {
-                let context = glib::MainContext::default();
+                let context = MainContext::default();
                 context.block_on(mock.touch_points()).unwrap_or_default()
             }
             _ => return,
