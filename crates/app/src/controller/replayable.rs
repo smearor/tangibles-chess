@@ -18,6 +18,13 @@ impl Replayable for GameController {
             self.screen.pop_overlay(&widget);
         }
         self.replay_index = Some(self.session.ply_count());
+        // A pending undo guide refers to the live position - replay
+        // replaces the scene, drop it.
+        self.undo_guided = false;
+        self.screen.surface.scene.update(|state| {
+            state.missing.clear();
+            state.foreign.clear();
+        });
         self.sync_scene();
     }
 

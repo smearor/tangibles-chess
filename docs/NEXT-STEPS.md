@@ -36,13 +36,15 @@ reuses the `PromotionPicker` overlay pattern (`RotationWidget` for the
 north edge); played moves lapse an open offer (FIDE convention); the
 MCP `resign`/`agree_draw` tools keep their direct, immediate semantics.
 
-## 4. Guided undo on the board (FR-CORE-6)
+## 4. Guided undo on the board (FR-CORE-6) ✅
 
-`UndoPlan` is computed but only `debug!`-logged. Visualize its
-physical rebuild steps (move-back list, captured-piece re-placement,
-castling rook, promotion reversal) on the scene — the existing
-missing/foreign marker and ceremony-highlight infrastructure from the
-handshake can be reused for the guidance.
+`undo()`/`redo()` now arm `undo_guided`: the plan steps flash on both
+status lines (localized via `undo-step-move`/`undo-step-restore`) and
+the scene shows the live physical↔logical diff with the handshake's
+`missing`/`foreign` markers — refreshed on every field event via the
+`OccupancyProbe`, cleared when the board matches the rewound position
+("position restored"). `NoTangibles` skips (rendered board already
+matches); entering replay clears a pending guide.
 
 ## 5. `DiagnosticsOverlay` (FR-UI-13)
 

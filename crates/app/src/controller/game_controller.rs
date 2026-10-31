@@ -81,6 +81,10 @@ pub struct GameController {
     /// Last rejected tangible move (`from`, `to`): the physical marker
     /// is misplaced; a lift+place back onto `from` is accepted quietly.
     pub(super) rejected_move: Option<MoveRequest>,
+    /// Guided undo in progress: the scene shows the physical↔logical
+    /// diff (`missing`/`foreign` markers) until the board matches the
+    /// rewound position.
+    pub(super) undo_guided: bool,
     /// Ply cursor while replaying a finished game (`None` = live).
     pub(super) replay_index: Option<Ply>,
     /// The game-over overlay widget, kept for removal when entering
@@ -127,6 +131,7 @@ impl GameController {
             result_shown: false,
             illegal_seq: 0,
             rejected_move: None,
+            undo_guided: false,
             replay_index: None,
             result_widget: None,
         }

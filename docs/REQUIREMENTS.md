@@ -91,9 +91,10 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   opponent; offers lapse on the next played move
 - **FR-CORE-6** `UndoPlan` computes the *physical* rebuild steps for a
   takeback (move-back list, captured-piece re-placement, castling rook,
-  promotion reversal) so tangible undo can be guided on the board. ✅ core
-  ⬜ guided UI — the plan is currently only `debug!`-logged; undo/redo
-  buttons work logically but give the player no physical guidance
+  promotion reversal) so tangible undo can be guided on the board. ✅ —
+  plan steps flash as status text and the scene shows the live
+  missing/foreign diff markers until the physical board matches the
+  rewound position
 - **FR-CORE-7** `SavedGame` (TOML) persists FEN-replayable move list +
   config + end state after every move (autosave). ✅
 - **FR-CORE-8** Resume: a saved game can be rebuilt

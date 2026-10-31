@@ -354,6 +354,7 @@ impl GameController {
             }
         }
         self.update_discrepancy();
+        self.refresh_undo_guide();
     }
 
     /// Physical-vs-logical board mismatch markers (`TangiblesRendered`).
