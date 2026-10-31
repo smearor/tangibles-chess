@@ -11,7 +11,11 @@ use crate::EngineError;
 /// ([`crate::EngineClient`]) and any embedded engine (a library with a
 /// blocking `best_move`); both run on the controller's engine worker
 /// thread, so blocking is fine.
-pub trait ChessEngine: Send {
+///
+/// Not `Send`-bound: implementations are constructed *inside* the
+/// worker thread (some embedded engines carry non-`Send` state like
+/// `Rc`/unsynced handles).
+pub trait ChessEngine {
     /// Starts a fresh game (clears any cached state).
     fn new_game(&mut self) -> Result<(), EngineError>;
 

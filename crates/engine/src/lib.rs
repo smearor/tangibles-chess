@@ -10,9 +10,11 @@ mod client;
 mod command;
 mod error;
 mod response;
+mod timecat_engine;
 
 pub use chess_engine::ChessEngine;
 pub use client::EngineClient;
 pub use command::EngineCommand;
 pub use error::EngineError;
 pub use response::EngineResponse;
+pub use timecat_engine::TimecatEngine;

@@ -12,6 +12,7 @@ use shakmaty::Move;
 use tangibles_chess_config::OpponentKind;
 use tangibles_chess_engine::ChessEngine;
 use tangibles_chess_engine::EngineClient;
+use tangibles_chess_engine::TimecatEngine;
 use tangibles_chess_material::Side;
 use tangibles_chess_moves::GamePhase;
 use tangibles_chess_moves::MoveRequest;
@@ -33,9 +34,6 @@ pub(super) enum EngineReply {
     /// The engine produced a move (`None` = `bestmove (none)`, e.g.
     /// terminal position).
     Move(Option<Move>),
-    /// The engine binary could not be started - the engine side stays
-    /// human-playable instead of crashing the game.
-    Unavailable(String),
     /// The engine session broke mid-game (lost process, bad reply).
     Failed(String),
 }
@@ -53,11 +51,17 @@ impl GameController {
         let (reply_tx, reply_rx) = mpsc::channel::<EngineReply>();
         let path = self.settings.engine_path.clone();
         std::thread::spawn(move || {
-            let mut engine: Box<dyn ChessEngine> = match EngineClient::spawn(&path) {
-                Ok(client) => Box::new(client),
-                Err(err) => {
-                    let _ = reply_tx.send(EngineReply::Unavailable(err.to_string()));
-                    return;
+            // `engine_path = "embedded"` selects the in-process engine;
+            // an external binary is tried first and falls back to it.
+            let mut engine: Box<dyn ChessEngine> = if path == "embedded" {
+                Box::new(TimecatEngine::default())
+            } else {
+                match EngineClient::spawn(&path) {
+                    Ok(client) => Box::new(client),
+                    Err(err) => {
+                        warn!("external engine at `{path}` unavailable ({err}) - falling back to embedded engine");
+                        Box::new(TimecatEngine::default())
+                    }
                 }
             };
             let _ = engine.new_game();
@@ -130,7 +134,7 @@ impl GameController {
                     EngineReply::Move(None) => {
                         controller.engine_pending_fen = None;
                     }
-                    EngineReply::Unavailable(err) | EngineReply::Failed(err) => {
+                    EngineReply::Failed(err) => {
                         warn!("engine opponent unavailable: {err}");
                         controller.engine_tx = None;
                         controller.engine_rx = None;

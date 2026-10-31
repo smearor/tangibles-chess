@@ -36,6 +36,7 @@ signal-hook = "0.4"
 # chess
 shakmaty = "0.30"
 pgn-reader = "0.29"
+timecat = { version = "1.53.0", default-features = false, features = ["inbuilt_nnue", "extras"] }
 # gtk
 gtk4 = { version = "0.11", features = ["v4_20"] }
 libadwaita = { version = "0.9", features = ["v1_5"] }

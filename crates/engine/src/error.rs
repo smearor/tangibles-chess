@@ -28,4 +28,7 @@ pub enum EngineError {
     /// The engine terminated unexpectedly.
     #[error("engine exited")]
     Exited,
+    /// The embedded engine reported a failure (fen parse, search).
+    #[error("embedded engine failed: {0}")]
+    Embedded(String),
 }

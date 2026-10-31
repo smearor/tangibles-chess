@@ -292,9 +292,12 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
 
 - **FR-ENG-1** AI opponent via external **UCI engine subprocess**
   (`tangibles-chess-engine`: spawn/uci/position/go/bestmove, run off
-  the GTK thread). ✅ — `ChessEngine` trait (embedded engines can
-  implement it), worker thread + reply poll, stale-FEN guard,
-  `OpponentKind::Agent` for MCP-driven sides
+  the GTK thread) or the embedded `timecat` NNUE engine.
+  ✅ — `ChessEngine` seam: `EngineClient` (process, `engine_path`) or
+  `TimecatEngine` (in-process, NNUE, no binary); worker thread +
+  reply poll, stale-FEN guard; `OpponentKind::Agent` for MCP-driven
+  sides. `engine_path = "embedded"` pins the embedded engine, a
+  spawn failure falls back to it
 - **FR-ENG-2** Optional auto-rotation toward the active player in
   `NoTangibles`. ⬜
 - **FR-ENG-3** Chess clocks (increment/fixed), per-edge display. ⬜
