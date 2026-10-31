@@ -139,17 +139,19 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   request; UI shows the picker toward the promoting player. ✅
 - **FR-TAN-11** `CommitMode::OnPlace` (casual: move commits on place)
   vs `CommitMode::OnConfirmZone` (strict: pending until the mover's
-  `btn-*` zone reports a placed contact — clock-puck style). ✅ inference 🐛 UX —
-  the controller applies the display intent immediately; see
-  `docs/bugs/on-confirm-zone-commit-order.md`
+  `btn-*` zone reports a placed contact — clock-puck style). ✅ —
+  `PendingIntent`/`MoveIntent` split, mover-edge commit, takeback
+  cancel, pending highlight + prompt (fix documented in
+  `docs/bugs/on-confirm-zone-commit-order.md`)
 - **FR-TAN-12** Tray zones (`tray-*`) count captured pieces per side;
   `cap-*` parking cells track occupancy and render the captured pieces
   beside the board. ✅
 - **FR-TAN-13** Anomalies (unexpected lift/place, extra contact, foreign
   field) produce `InferenceOutput::Anomaly` events, surface in the UI
   and trigger occupancy resync; the game must never silently corrupt
-  board state. ✅ events + status-line surfacing ⬜ anomaly-triggered
-  resync + recovery UX (resync currently only on `LAGGED`)
+  board state. ✅ — gesture anomalies run `inference.reset()` +
+  `resync_occupancy()` (`Anomaly::needs_resync`); stray zone presses
+  only warn
 - **FR-TAN-14** `LAGGED` subscription events and stream errors force a
   `touchPoints` resync — the physical board is source of truth. ✅
   (stream errors are translated into `Lagged` events; parking strips
@@ -345,7 +347,7 @@ data MIT/Apache, Cuernavaca OFL — recorded in NOTICE).
 ## 13. Verification & Acceptance
 
 - **V-1** `cargo build/test/clippy --workspace` green, `cargo fmt
-  --check` clean. ✅ (74 tests)
+  --check` clean. ✅ (78 tests)
 - **V-2** `NoTangibles` playable end-to-end on desktop without daemon. ✅ baseline
 - **V-3** Manual tabletop checks: rotation 0/90/180/270°, touch
   accuracy, both-edge readability. ⬜

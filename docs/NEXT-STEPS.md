@@ -4,27 +4,26 @@ Prioritized proposal for completing M2 and starting M3, based on the
 implementation audit against `docs/REQUIREMENTS.md` (2026-10-29).
 Requirement IDs refer to that document.
 
-## 1. Fix `CommitMode::OnConfirmZone` (FR-TAN-11)
+## 1. Fix `CommitMode::OnConfirmZone` (FR-TAN-11) ✅
 
-The strict commit mode is currently defective: moves commit on place
-anyway and the confirm-zone press produces a spurious illegal-move
-flash. Root cause and fix direction are documented in
-`docs/bugs/on-confirm-zone-commit-order.md`.
+Fixed per `docs/bugs/on-confirm-zone-commit-order.md`: `commit()` now
+emits `PendingIntent` (display-only) instead of an immediately applied
+`MoveIntent`; only the mover's `btn-{edge}` press completes the intent
+(`ConfirmWrongEdge`/`ConfirmWithoutPending` anomalies otherwise);
+lifting the pending destination cancels via `Cancelled` + `takeback`
+restore; the scene shows a destination highlight plus a per-side
+"press your button" status line.
 
-- Make the inference output contract explicit (`PendingIntent` vs
-  `MoveIntent`) or gate the apply in the controller
-- Only the mover's `btn-{edge}` completes a pending intent
-- Clear the pending state when the placed piece is lifted again
-- Add a pending-confirm UI state (destination highlight + status line)
-- Cover it end-to-end with `MockSource`
+- Remaining: drive it end-to-end through `MockSource` (covered so far
+  at `MoveInference` unit level).
 
-## 2. Anomaly-triggered occupancy resync (FR-TAN-13)
+## 2. Anomaly-triggered occupancy resync (FR-TAN-13) ✅
 
-`InferenceOutput::Anomaly` currently only flashes a transient status
-line. Call `resync_occupancy()` on anomalies as well (not only on
-`Lagged`) so the physical board re-establishes truth after protocol
-violations. Small change in `GameController::on_game_field_event`,
-high robustness payoff before hardware testing.
+`Anomaly::needs_resync()` distinguishes gesture violations (lift/place
+protocol breaks) from stray zone presses; the controller now calls
+`inference.reset()` + clears the in-air/pending scene glow +
+`resync_occupancy()` on the former, so the physical board re-establishes
+truth instead of cascading anomalies off stale in-air state.
 
 ## 3. Draw offer / resign confirmation flows (FR-UI-6, FR-CORE-5)
 

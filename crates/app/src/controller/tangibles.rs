@@ -337,6 +337,18 @@ impl GameController {
                 InferenceOutput::Anomaly(reason) => {
                     warn!("board anomaly: {reason}");
                     self.screen.show_message_for(self.session.turn(), &self.l10n.msg("anomaly-detail"));
+                    if reason.needs_resync() {
+                        // A gesture violation leaves the inference state
+                        // untrustworthy: drop the in-flight interpretation
+                        // and re-establish physical truth (FR-TAN-13).
+                        self.inference.reset();
+                        self.screen.surface.scene.update(|s| {
+                            s.lifted = None;
+                            s.legal_targets.clear();
+                            s.pending = None;
+                        });
+                        self.resync_occupancy();
+                    }
                 }
                 InferenceOutput::Lagged => self.resync_occupancy(),
             }

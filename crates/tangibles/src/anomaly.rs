@@ -31,6 +31,15 @@ pub enum Anomaly {
 }
 
 impl Anomaly {
+    /// Whether the violation invalidates the in-flight board
+    /// interpretation: gesture anomalies leave `MoveInference` state
+    /// untrustworthy and warrant a `reset()` + occupancy resync, while
+    /// zone-press anomalies (`btn-*` mistaps) leave the buffered intent
+    /// and the physical read intact - warn only.
+    pub fn needs_resync(&self) -> bool {
+        !matches!(self, Self::ConfirmWrongEdge | Self::ConfirmWithoutPending)
+    }
+
     /// All anomaly kinds, for exhaustive iteration (tests).
     pub const ALL: [Self; 10] = [
         Self::CaptureWithoutAir,
