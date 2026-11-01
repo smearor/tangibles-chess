@@ -2,6 +2,7 @@ mod controller;
 mod l10n;
 mod placement_issue;
 mod playable;
+mod registration_failure;
 mod replayable;
 mod rotatable;
 mod settings;

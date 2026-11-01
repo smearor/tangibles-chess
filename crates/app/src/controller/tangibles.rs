@@ -127,7 +127,10 @@ impl GameController {
                     info!("field set registered");
                     controller_ref.update_placement();
                 }
-                Some(Err(err)) => warn!("field set registration failed: {err}"),
+                Some(Err(err)) => {
+                    warn!("field set registration failed: {err}");
+                    crate::registration_failure::set(err.to_string());
+                }
                 None => warn!("field set registration skipped: no tangible host"),
             }
             ControlFlow::Break

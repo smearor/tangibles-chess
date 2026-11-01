@@ -6,6 +6,7 @@ use tangible_objects_model::FieldSet;
 use tangible_objects_model::FieldSetName;
 use tangible_objects_model::Lifetime;
 use tangible_objects_model::Owner;
+use tangible_objects_model::RegisterFieldSetResult;
 use tracing::debug;
 use tracing::warn;
 
@@ -86,10 +87,17 @@ impl TangibleSource for GraphQlSource {
     }
 
     async fn register_field_set(&self, spec: &FieldSet) -> Result<(), DaemonError> {
-        self.client
+        match self
+            .client
             .register_field_set(spec, Some(&Owner::new(crate::REGISTRATION_OWNER)), Lifetime::Session)
-            .await?;
-        Ok(())
+            .await?
+        {
+            RegisterFieldSetResult::Registered(_) => Ok(()),
+            RegisterFieldSetResult::Rejected(rejected) => Err(DaemonError::Rejected {
+                kind: rejected.kind,
+                reason: rejected.reason,
+            }),
+        }
     }
 
     async fn unregister(&self) -> Result<(), DaemonError> {

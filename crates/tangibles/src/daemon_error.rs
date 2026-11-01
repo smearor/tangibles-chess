@@ -1,3 +1,4 @@
+use tangible_objects_model::RejectionKind;
 use thiserror::Error;
 
 /// Errors of the daemon-facing layer.
@@ -15,4 +16,13 @@ pub enum DaemonError {
     /// The daemon is not reachable or the connection closed.
     #[error("daemon unavailable: {0}")]
     Unavailable(String),
+    /// A registration was rejected with a typed reason (`kind` is the
+    /// machine category, `reason` the daemon's message).
+    #[error("registration rejected ({kind:?}): {reason}")]
+    Rejected {
+        /// Machine-readable rejection category.
+        kind: RejectionKind,
+        /// The daemon's human-readable rejection message.
+        reason: String,
+    },
 }

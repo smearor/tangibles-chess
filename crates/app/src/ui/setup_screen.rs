@@ -172,6 +172,16 @@ impl SetupScreen {
             let ctx = ctx.clone();
             move |facing| Self::build_card(facing, &ctx)
         });
+        // A rejected field-set registration surfaces here so the user
+        // can fix the daemon/geometry instead of wondering why the
+        // handshake never completes.
+        if let Some(reason) = crate::registration_failure::take() {
+            let mut args = fluent::FluentArgs::new();
+            args.set("reason", reason);
+            let banner = adw::Banner::new(&ctx.l10n.msg_args("setup-registration-failed", &args));
+            banner.set_revealed(true);
+            row.widget.prepend(&banner);
+        }
         // Render the initial config onto both card copies.
         ctx.sync.refresh(&ctx.config);
         Self {

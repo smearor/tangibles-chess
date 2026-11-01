@@ -72,6 +72,9 @@ pub use tangible_objects_model::ContactCount;
 /// The dropped-event count domain type (lagged subscriptions).
 pub use tangible_objects_model::EventCount;
 
+/// The machine-readable rejection category of a registration.
+pub use tangible_objects_model::RejectionKind;
+
 /// Field set name registered with the daemon for chess.
 pub const FIELD_SET_NAME: &str = "chess";
 /// Owner name used for daemon registrations of this app.
