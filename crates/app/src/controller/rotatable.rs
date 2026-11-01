@@ -27,5 +27,8 @@ impl Rotatable for GameController {
         self.geometry = BoardGeometry::new(self.screen.orientation(), self.geometry.white_edge());
         self.inference = MoveInference::new(self.geometry, self.session.config().commit_mode);
         self.gate = PlacementGate::new(self.geometry);
+        // Rotation moves the rendered parking strips - refresh so
+        // parked markers swap sides immediately, not on the next event.
+        self.sync_scene();
     }
 }

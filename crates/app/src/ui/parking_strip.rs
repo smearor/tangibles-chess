@@ -45,4 +45,13 @@ impl ParkingStrip {
     pub fn clear(&mut self) {
         *self = Self::default();
     }
+
+    /// A vertically flipped copy - under a 180° tabletop rotation the
+    /// strip's physical top displays at the rendered bottom, so cells
+    /// must be reversed when the strip is drawn on the other side.
+    pub fn flipped(&self) -> Self {
+        let mut cells = self.cells;
+        cells.reverse();
+        Self { cells }
+    }
 }

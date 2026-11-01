@@ -5,6 +5,7 @@ use shakmaty::KnownOutcome;
 use shakmaty::Position;
 use shakmaty::Square;
 use tangibles_chess_config::GameConfig;
+use tangibles_chess_geometry::BoardOrientation;
 use tangibles_chess_icons::icon_names;
 use tangibles_chess_material::Piece;
 use tangibles_chess_material::Side;
@@ -46,8 +47,17 @@ impl GameController {
         let mut captured = self.session.captured_pieces().into_iter();
         self.parked_west.assign_pieces(&mut captured);
         self.parked_east.assign_pieces(&mut captured);
-        let cap_west = self.parked_west;
-        let cap_east = self.parked_east;
+        // The daemon fields are anchored in physical millimetres (west
+        // strip = left of the board), while `cap_*` render slots are
+        // scene-anchored. Under a 180° rotation the west strip displays
+        // on the right (and upside down), so the data must swap sides
+        // and flip rows. Under 90°/270° the strips render on horizontal
+        // edges where no physical strip sits - no swap there.
+        let (cap_west, cap_east) = if self.screen.orientation() == BoardOrientation::Deg180 {
+            (self.parked_east.flipped(), self.parked_west.flipped())
+        } else {
+            (self.parked_west, self.parked_east)
+        };
         self.screen.surface.scene.update(|state| {
             state.position = Some(position.clone());
             state.check = check.flatten();
