@@ -420,6 +420,26 @@ mod imp {
                     }
                 }
             }
+
+            // Capture affordance on occupied legal targets: a ring on
+            // top of the defending piece - the plain `target_dot` in
+            // the square layer paints *under* pieces and is invisible
+            // on capture squares.
+            if let Some(position) = &state.position {
+                let captures: Vec<Square> = state
+                    .legal_targets
+                    .iter()
+                    .copied()
+                    .filter(|square| position.board().piece_at(*square).is_some())
+                    .collect();
+                if !captures.is_empty() {
+                    let ring = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
+                    for square in captures {
+                        let scene = square_scene(square);
+                        ring_highlight(&ring, bx + (scene % 8) as f64 * cell, by + (scene / 8) as f64 * cell, cell, palette.target);
+                    }
+                }
+            }
         }
     }
 }

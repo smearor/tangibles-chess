@@ -159,6 +159,16 @@ impl GameController {
         }
     }
 
+    /// The side whose army needs physical markers - `None` when both
+    /// players are human. Engine/agent armies exist only on screen:
+    /// the placement gate verifies only the human's pieces, and a
+    /// marker on an opponent square counts as unexpected.
+    pub(super) fn physical_side(&self) -> Option<shakmaty::Color> {
+        use tangibles_chess_config::OpponentKind;
+        let virtual_black = matches!(self.session.config().black, OpponentKind::Engine | OpponentKind::Agent);
+        virtual_black.then_some(shakmaty::Color::White)
+    }
+
     /// Starts the configured game: session phase transition, tangible
     /// activation when the mode needs the daemon.
     pub fn begin(controller: Rc<RefCell<Self>>) {

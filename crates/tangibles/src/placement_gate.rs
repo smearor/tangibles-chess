@@ -1,4 +1,5 @@
 use shakmaty::Chess;
+use shakmaty::Color;
 use shakmaty::Position;
 use shakmaty::Square;
 
@@ -29,10 +30,18 @@ impl PlacementGate {
     /// Marker identity is 1-contact - the check verifies *occupancy*, not
     /// which piece stands where; piece-identity mismatches surface later
     /// via move inference anomalies.
-    pub fn check(&self, expected: &Chess, probe: &OccupancyProbe) -> PlacementStatus {
+    ///
+    /// `physical_side` scopes the check to one army: when the opponent
+    /// is virtual (engine/agent), their squares expect no marker - but
+    /// a stray marker there still counts as `unexpected` since it can
+    /// only confuse move inference.
+    pub fn check(&self, expected: &Chess, probe: &OccupancyProbe, physical_side: Option<Color>) -> PlacementStatus {
         let mut status = PlacementStatus::default();
         for square in Square::ALL {
-            let wants_piece = expected.board().piece_at(square).is_some();
+            let wants_piece = expected
+                .board()
+                .piece_at(square)
+                .is_some_and(|piece| physical_side.is_none_or(|side| piece.color == side));
             let has_marker = self.geometry.square_to_field(square).is_some_and(|f| probe.occupied().contains(&f));
             match (wants_piece, has_marker) {
                 (true, true) => status.correct.push(square),
@@ -80,7 +89,7 @@ mod tests {
         let gate = PlacementGate::new(BoardGeometry::tabletop());
         // Deg0: ranks 8/7 = fields 0..16, ranks 1/2 = fields 48..64.
         let fields: Vec<usize> = (0..16).chain(48..64).collect();
-        let status = gate.check(&Chess::default(), &probe_with(&fields));
+        let status = gate.check(&Chess::default(), &probe_with(&fields), None);
         assert!(status.is_consistent());
         assert_eq!(status.total, 32);
         assert_eq!(status.placed(), 32);
@@ -91,9 +100,26 @@ mod tests {
         let gate = PlacementGate::new(BoardGeometry::tabletop());
         // All expected pieces except field 12, plus a stray on f20.
         let fields: Vec<usize> = (0..16).filter(|i| *i != 12).chain(48..64).chain([20]).collect();
-        let status = gate.check(&Chess::default(), &probe_with(&fields));
+        let status = gate.check(&Chess::default(), &probe_with(&fields), None);
         assert!(!status.is_consistent());
         assert_eq!(status.missing, vec![shakmaty::Square::E7]);
         assert_eq!(status.unexpected, vec![shakmaty::Square::E6]);
+    }
+
+    #[test]
+    fn virtual_opponent_needs_only_the_physical_army() {
+        let gate = PlacementGate::new(BoardGeometry::tabletop());
+        // Black is a virtual army (engine/agent): only the white home
+        // ranks (fields 48..64) need markers.
+        let fields: Vec<usize> = (48..64).collect();
+        let status = gate.check(&Chess::default(), &probe_with(&fields), Some(shakmaty::Color::White));
+        assert!(status.is_consistent());
+        assert_eq!(status.total, 16);
+        assert_eq!(status.placed(), 16);
+        // A stray marker on a virtual-black square is still unexpected.
+        let fields: Vec<usize> = (48..64).chain([10]).collect();
+        let status = gate.check(&Chess::default(), &probe_with(&fields), Some(shakmaty::Color::White));
+        assert!(!status.is_consistent());
+        assert_eq!(status.unexpected, vec![shakmaty::Square::C7]);
     }
 }

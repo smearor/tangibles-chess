@@ -223,7 +223,7 @@ impl GameController {
         if self.session.phase() != GamePhase::AwaitingPlacement {
             return;
         }
-        let status = self.gate.check(self.session.position(), &self.probe);
+        let status = self.gate.check(self.session.position(), &self.probe, self.physical_side());
         self.screen.surface.scene.update(|state| {
             state.missing = status.missing.clone();
             state.foreign = status.unexpected.clone();

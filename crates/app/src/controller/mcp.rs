@@ -146,7 +146,7 @@ impl GameController {
                 CommandReply::Diagnostics(DiagnosticsReply { enabled: *enabled })
             }
             CommandKind::PlacementStatus => {
-                let status = self.gate.check(self.session.position(), &self.probe);
+                let status = self.gate.check(self.session.position(), &self.probe, self.physical_side());
                 CommandReply::Placement(PlacementReply {
                     placed: status.placed(),
                     total: status.total,
