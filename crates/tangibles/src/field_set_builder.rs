@@ -61,6 +61,7 @@ impl FieldSetBuilder {
             stability: FrameCount::new(2),
             fields,
             suppress: true,
+            enabled: true,
         }
     }
 
