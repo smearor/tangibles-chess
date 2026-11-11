@@ -102,6 +102,10 @@ impl Default for SceneState {
 /// Tap callback receiving a scene-space square.
 type SquareHandler = Rc<dyn Fn(Square)>;
 
+/// Diagnostics overlay color (field indices, contact counts, raw
+/// touch points) - warm red, readable on any board material.
+const DIAGNOSTIC: Color<f64> = Color::<f64>::new(0.95, 0.3, 0.2);
+
 /// A rejected move's flash: the rejected target plus, when the naive
 /// move would have left the own king in check, the king and its
 /// attackers.
@@ -315,7 +319,7 @@ mod imp {
                 if state.diagnostics {
                     let font = cell * 0.16;
                     squares.set_font_size(font);
-                    squares.set_source_rgba(0.95, 0.3, 0.2, 0.8);
+                    DIAGNOSTIC.apply_alpha(&squares, 0.8);
                     squares.move_to(x + cell * 0.06, y + font * 1.2);
                     let _ = squares.show_text(&format!("f{scene}"));
                     if let Some(count) = FieldIndex::new(scene).and_then(|index| state.diag_counts.get(&index)) {
@@ -357,7 +361,7 @@ mod imp {
 
             // Diagnostics: raw touch points as dots on the board area.
             if state.diagnostics {
-                squares.set_source_rgba(0.95, 0.3, 0.2, 0.5);
+                DIAGNOSTIC.apply_alpha(&squares, 0.5);
                 for &(tx, ty) in &state.diag_touches {
                     squares.arc(tx, ty, cell * 0.2, 0.0, std::f64::consts::TAU);
                     let _ = squares.fill();

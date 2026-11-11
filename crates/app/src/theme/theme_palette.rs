@@ -81,7 +81,11 @@ impl ThemePalette {
                 TextureLayout::BoardWide,
             ),
         };
-        let palette = Self { colors, texture, texture_layout };
+        let palette = Self {
+            colors,
+            texture,
+            texture_layout,
+        };
         debug_assert!(palette.colors.is_complete());
         palette
     }
@@ -91,7 +95,7 @@ impl ThemePalette {
     /// All palettes built by [`ThemePalette::of`] are complete; a
     /// missing slot falls back to black rather than panicking.
     pub fn color(&self, slot: ThemeSlot) -> Color<f64> {
-        self.colors.get_or(slot, Color::BLACK)
+        self.colors.get_or(&slot, Color::<f64>::BLACK)
     }
 }
 

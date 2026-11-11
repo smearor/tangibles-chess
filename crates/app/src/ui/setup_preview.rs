@@ -22,18 +22,18 @@ type Rgb = Color<f64>;
 
 /// Muted neutral board colors for the schematic previews (orientation
 /// and commit mode are drawn theme-agnostic).
-const NEUTRAL_LIGHT: Rgb = Color::new(0.82, 0.82, 0.80);
-const NEUTRAL_DARK: Rgb = Color::new(0.42, 0.44, 0.47);
-const NEUTRAL_FRAME: Rgb = Color::new(0.30, 0.30, 0.30);
+const NEUTRAL_LIGHT: Rgb = Color::<f64>::new(0.82, 0.82, 0.80);
+const NEUTRAL_DARK: Rgb = Color::<f64>::new(0.42, 0.44, 0.47);
+const NEUTRAL_FRAME: Rgb = Color::<f64>::new(0.30, 0.30, 0.30);
 
 /// Warm highlight (targets, check marks).
-const ACCENT: Rgb = Color::new(0.98, 0.80, 0.30);
+const ACCENT: Rgb = Color::<f64>::new(0.98, 0.80, 0.30);
 /// Light piece fill.
-const WHITE_PIECE: Rgb = Color::new(0.95, 0.95, 0.94);
+const WHITE_PIECE: Rgb = Color::<f64>::new(0.95, 0.95, 0.94);
 /// Dark piece fill.
-const BLACK_PIECE: Rgb = Color::new(0.16, 0.16, 0.17);
+const BLACK_PIECE: Rgb = Color::<f64>::new(0.16, 0.16, 0.17);
 /// Confirm check mark.
-const OK_GREEN: Rgb = Color::new(0.35, 0.75, 0.40);
+const OK_GREEN: Rgb = Color::<f64>::new(0.35, 0.75, 0.40);
 
 /// Preview of a board theme: the real material palette rendered as a
 /// miniature 8x8 board.
@@ -263,7 +263,7 @@ fn piece(cr: &Context, x: f64, y: f64, radius: f64) {
 /// A raised physical marker (puck) with a small shadow and inner ring.
 fn puck(cr: &Context, x: f64, y: f64, radius: f64) {
     cr.arc(x + radius * 0.15, y + radius * 0.22, radius, 0.0, std::f64::consts::TAU);
-    Color::BLACK.apply_alpha(cr, 0.25);
+    Color::<f64>::BLACK.apply_alpha(cr, 0.25);
     let _ = cr.fill();
     disc(cr, x, y, radius, BLACK_PIECE);
     ring(cr, x, y, radius * 0.6, NEUTRAL_LIGHT);
