@@ -10,6 +10,7 @@ use tangibles_chess_config::CommitMode;
 use tangibles_chess_config::GameConfig;
 use tangibles_chess_config::OpponentKind;
 use tangibles_chess_config::TangibleMode;
+use tangibles_chess_config::TimeControl;
 use tangibles_chess_geometry::BoardOrientation;
 use tangibles_chess_icons::icon_names;
 use tangibles_chess_session::SavedGame;
@@ -353,6 +354,30 @@ impl SetupScreen {
             |config, kind| config.black = kind,
         );
         group.add(&opponent.row);
+
+        // Chess clock (FR-ENG-3): untimed, fixed-time and increment
+        // presets - the label is the standard `{minutes}+{increment}`
+        // notation.
+        let option = |initial_seconds: u32, increment_seconds: u32| {
+            let control = TimeControl::new(initial_seconds, increment_seconds);
+            (Some(control), control.notation(), setup_preview::clock_preview(Some(control)))
+        };
+        group.add(
+            &Self::picker_row(
+                ctx,
+                &l10n.msg("setup-clock-label"),
+                vec![
+                    (None, l10n.msg("setup-clock-off"), setup_preview::clock_preview(None)),
+                    option(300, 0),
+                    option(600, 0),
+                    option(600, 5),
+                    option(900, 10),
+                ],
+                |config| config.time_control,
+                |config, time_control| config.time_control = time_control,
+            )
+            .row,
+        );
 
         // Placement handshake and sound in one row.
         let toggles = adw::PreferencesRow::new();

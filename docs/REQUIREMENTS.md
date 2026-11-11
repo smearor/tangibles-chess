@@ -211,10 +211,10 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   check highlight, last-move trail, lifted/ghost pieces, ceremony
   states, missing/foreign markers, optional piece glyphs. ✅
 - **FR-UI-8** Player panels on both edges: name/color, turn indicator,
-  clock placeholder (M3), captured-material tray display, action
+  clock display, captured-material tray display, action
   buttons (resign, draw, undo, rotate) with icon-set icons. ✅ — tray
   count label + `cap-*` parking strips render captured pieces;
-  ⬜ clock placeholder
+  per-edge serif clock display (FR-ENG-3)
 - **FR-UI-9** **Score sheets** on both long edges, each upright to its
   player (notation in SAN); clicking a ply seeks the replay cursor in
   finished games. ✅
@@ -300,7 +300,15 @@ docs should reference them. Status markers: ✅ done, 🟡 partial,
   spawn failure falls back to it
 - **FR-ENG-2** Optional auto-rotation toward the active player in
   `NoTangibles`. ⬜
-- **FR-ENG-3** Chess clocks (increment/fixed), per-edge display. ⬜
+- **FR-ENG-3** Chess clocks (increment/fixed), per-edge display.
+  ✅ — `TimeControl` preset picker on the setup screen (untimed,
+  fixed and Fischer-increment presets); the session-owned `ChessClock`
+  starts on `begin`/placement confirm, presses inside `request_move`,
+  stops on every terminal transition and re-points on undo/redo;
+  flag fall ends the game (decisive, or draw when the winner cannot
+  mate - FIDE 6.9); banked budgets persist in the autosave; a GTK
+  timer ticks the per-edge serif display (tenths under 10 s);
+  `game_state` exposes the live snapshot
 - **FR-ENG-4** PGN load/save. ⬜ — `pgn-reader` is declared in the
   workspace deps but not yet used by any crate
 

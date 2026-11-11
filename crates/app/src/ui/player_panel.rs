@@ -12,10 +12,13 @@ use tangibles_chess_material::Side;
 /// both panel instances act identically.
 pub struct PlayerPanel {
     /// The panel (centered control buttons, captured tray overlaid at
-    /// the left edge).
+    /// the left edge; the chess clock closes the button row).
     pub widget: gtk4::Overlay,
     /// Captured-material glyphs/text.
     captured: gtk4::Label,
+    /// Chess-clock display at the panel's right edge (FR-ENG-3);
+    /// hidden for untimed games.
+    clock: gtk4::Label,
     /// Undo button (sensitivity follows config + history).
     undo: gtk4::Button,
     /// Redo button (sensitivity follows the redo stack).
@@ -119,6 +122,14 @@ impl PlayerPanel {
         buttons.append(&menu);
         buttons.append(&exit_replay);
 
+        // The clock sits inside the button row so it can never overlap
+        // the controls; hidden entirely for untimed games.
+        let clock = gtk4::Label::new(None);
+        clock.add_css_class("clock-label");
+        clock.set_valign(gtk4::Align::Center);
+        clock.set_visible(false);
+        buttons.append(&clock);
+
         buttons.set_halign(gtk4::Align::Center);
         widget.set_child(Some(&buttons));
         captured.set_halign(gtk4::Align::Start);
@@ -131,6 +142,7 @@ impl PlayerPanel {
         Self {
             widget,
             captured,
+            clock,
             undo,
             redo,
             draw,
@@ -182,6 +194,28 @@ impl PlayerPanel {
     /// Updates the captured-material display (e.g. `♟♟♞` or counts).
     pub fn set_captured(&self, text: &str) {
         self.captured.set_text(text);
+    }
+
+    /// Updates the chess-clock display: `running` highlights the side
+    /// currently on the countdown, `flagged` paints the fallen flag.
+    pub fn set_clock(&self, text: &str, running: bool, flagged: bool) {
+        self.clock.set_text(text);
+        self.clock.set_visible(true);
+        if running {
+            self.clock.add_css_class("running");
+        } else {
+            self.clock.remove_css_class("running");
+        }
+        if flagged {
+            self.clock.add_css_class("flagged");
+        } else {
+            self.clock.remove_css_class("flagged");
+        }
+    }
+
+    /// Hides the clock display (untimed games).
+    pub fn hide_clock(&self) {
+        self.clock.set_visible(false);
     }
 
     /// Marks this panel as the side to move.

@@ -21,6 +21,7 @@ use tangibles_chess_notation::San;
 use tangibles_chess_notation::Uci;
 use tangibles_chess_undo::UndoPlan;
 
+use crate::ChessClock;
 use crate::DrawReason;
 use crate::GameError;
 use crate::SavedGame;
@@ -55,13 +56,17 @@ pub struct GameSession {
     agreed_draw: bool,
     /// Side whose draw offer still awaits the opponent's answer.
     draw_offer: Option<Side>,
+    /// Per-side chess clock (FR-ENG-3); `None` for untimed games.
+    clock: Option<ChessClock>,
 }
 
 impl GameSession {
     /// A session in `Setup` phase for the given configuration.
     pub fn new(config: GameConfig) -> Self {
         let position = Chess::default();
+        let clock = config.time_control.map(ChessClock::new);
         Self {
+            clock,
             config,
             phase: GamePhase::Setup,
             hashes: vec![position.zobrist_hash::<Zobrist64>(EnPassantMode::Legal)],
@@ -90,6 +95,10 @@ impl GameSession {
         session.ucis = saved.moves.clone();
         session.resigned = saved.resigned;
         session.agreed_draw = saved.agreed_draw;
+        session.clock = saved.config.time_control.map(|control| match saved.clock_ms {
+            Some([white_ms, black_ms]) => ChessClock::resume(control, white_ms, black_ms),
+            None => ChessClock::new(control),
+        });
         // A saved game that already ended restores its finished state;
         // `begin()` will not resurrect it.
         session.phase = GamePhase::InProgress;
@@ -125,6 +134,9 @@ impl GameSession {
         } else {
             GamePhase::InProgress
         };
+        if self.phase == GamePhase::InProgress {
+            self.start_clock();
+        }
     }
 
     /// Releases the game once the physical board matches the position
@@ -132,6 +144,7 @@ impl GameSession {
     pub fn confirm_placement(&mut self) {
         if self.phase == GamePhase::AwaitingPlacement {
             self.phase = GamePhase::InProgress;
+            self.start_clock();
         }
     }
 
@@ -224,6 +237,10 @@ impl GameSession {
                 // A played move answers any open draw offer (FIDE:
                 // the offer lapses once the opponent moves).
                 self.draw_offer = None;
+                let mover = self.turn().other();
+                if let Some(clock) = &mut self.clock {
+                    clock.press(mover);
+                }
                 self.finish_if_terminal();
                 MoveOutcome::Applied(san)
             }
@@ -276,6 +293,7 @@ impl GameSession {
         let san = self.sans.pop()?;
         let uci = self.ucis.pop()?;
         self.future.push((current.clone(), hash, san, uci));
+        self.start_clock();
         Some(UndoPlan::between(&self.position, &current))
     }
 
@@ -291,15 +309,25 @@ impl GameSession {
         self.hashes.push(hash);
         self.sans.push(san);
         self.ucis.push(uci);
+        self.start_clock();
         Some(UndoPlan::between(&position, &current))
     }
 
     /// Terminal outcome per shakmaty (mate, stalemate, material) plus
-    /// session-level results (resignation, agreed draw, automatic draw
-    /// rules). `None` while the game is ongoing.
+    /// session-level results (resignation, agreed draw, flag fall,
+    /// automatic draw rules). `None` while the game is ongoing.
     pub fn outcome(&self) -> Option<KnownOutcome> {
         if let Some(loser) = self.resigned {
             return Some(KnownOutcome::Decisive { winner: loser.other().into() });
+        }
+        // Flag fall: the non-flagged side wins unless it cannot possibly
+        // checkmate - then the game is drawn (FIDE 6.9).
+        if let Some(loser) = self.clock.as_ref().and_then(ChessClock::flagged) {
+            return if self.position.is_insufficient_material() {
+                Some(KnownOutcome::Draw)
+            } else {
+                Some(KnownOutcome::Decisive { winner: loser.other().into() })
+            };
         }
         if self.agreed_draw || self.automatic_draw().is_some() {
             return Some(KnownOutcome::Draw);
@@ -352,12 +380,14 @@ impl GameSession {
     /// Resigns the game for `side`.
     pub fn resign(&mut self, side: Side) {
         self.resigned = Some(side);
+        self.stop_clock();
         self.phase = GamePhase::Finished;
     }
 
     /// Marks the game drawn by agreement.
     pub fn agree_draw(&mut self) {
         self.agreed_draw = true;
+        self.stop_clock();
         self.phase = GamePhase::Finished;
     }
 
@@ -377,6 +407,7 @@ impl GameSession {
     pub fn accept_draw(&mut self) -> bool {
         if self.draw_offer.take().is_some() {
             self.agreed_draw = true;
+            self.stop_clock();
             self.phase = GamePhase::Finished;
             return true;
         }
@@ -388,11 +419,39 @@ impl GameSession {
         self.draw_offer = None;
     }
 
-    /// Marks a finished game (terminal outcome reached on the board).
+    /// Marks a finished game (terminal outcome reached on the board or
+    /// by the clock).
     pub fn finish_if_terminal(&mut self) {
         if self.phase == GamePhase::InProgress && self.outcome().is_some() {
+            self.stop_clock();
             self.phase = GamePhase::Finished;
         }
+    }
+
+    /// The session's chess clock, if the game is timed.
+    pub fn clock(&self) -> Option<&ChessClock> {
+        self.clock.as_ref()
+    }
+
+    /// The side whose flag fell, if the game was lost on time.
+    pub fn flag_fall(&self) -> Option<Side> {
+        self.clock.as_ref().and_then(ChessClock::flagged)
+    }
+
+    /// Debits the running clock; returns `true` when this tick flagged a
+    /// side and ended the game.
+    pub fn tick_clock(&mut self) -> bool {
+        if self.phase != GamePhase::InProgress {
+            return false;
+        }
+        let Some(clock) = &mut self.clock else {
+            return false;
+        };
+        if clock.tick().is_none() {
+            return false;
+        }
+        self.finish_if_terminal();
+        true
     }
 
     /// SAN strings of all played moves.
@@ -418,6 +477,26 @@ impl GameSession {
             sans: self.sans.clone(),
             resigned: self.resigned,
             agreed_draw: self.agreed_draw,
+            clock_ms: self
+                .clock
+                .as_ref()
+                .map(|clock| [clock.remaining_ms(Side::White), clock.remaining_ms(Side::Black)]),
+        }
+    }
+
+    /// Hands the countdown to the side to move, banking elapsed time
+    /// first (game start, placement confirmation, undo/redo).
+    fn start_clock(&mut self) {
+        let turn = self.turn();
+        if let Some(clock) = &mut self.clock {
+            clock.start(turn);
+        }
+    }
+
+    /// Stops the countdown (any terminal transition).
+    fn stop_clock(&mut self) {
+        if let Some(clock) = &mut self.clock {
+            clock.stop();
         }
     }
 
@@ -443,9 +522,11 @@ mod tests {
     use shakmaty::Square;
 
     use super::GameSession;
+    use crate::ChessClock;
     use crate::DrawReason;
     use tangibles_chess_config::GameConfig;
     use tangibles_chess_config::TangibleMode;
+    use tangibles_chess_config::TimeControl;
     use tangibles_chess_material::Role;
     use tangibles_chess_material::Side;
     use tangibles_chess_moves::GamePhase;
@@ -695,5 +776,72 @@ mod tests {
         }
         assert_eq!(session.phase(), GamePhase::Finished);
         assert!(session.position().is_checkmate());
+    }
+
+    fn timed_session() -> GameSession {
+        let mut session = GameSession::new(GameConfig {
+            time_control: Some(TimeControl::new(60, 2)),
+            ..GameConfig::default()
+        });
+        session.begin();
+        session
+    }
+
+    #[test]
+    fn clock_starts_on_begin_and_presses_on_move() {
+        let mut session = timed_session();
+        let clock = session.clock().expect("clock");
+        assert!(clock.is_running(Side::White));
+        assert!(!clock.is_running(Side::Black));
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        let clock = session.clock().expect("clock");
+        assert!(clock.is_running(Side::Black));
+        // The mover's spent time is banked and the increment credited.
+        assert!(clock.remaining_ms(Side::White) <= 62_000);
+    }
+
+    #[test]
+    fn flag_fall_finishes_decisive() {
+        let mut session = timed_session();
+        session.clock = Some(ChessClock::resume(TimeControl::new(60, 0), 0, 60_000));
+        session.clock.as_mut().expect("clock").start(Side::White);
+        assert!(session.tick_clock());
+        assert_eq!(session.phase(), GamePhase::Finished);
+        assert!(matches!(session.outcome(), Some(shakmaty::KnownOutcome::Decisive { winner: Color::Black })));
+        assert_eq!(session.flag_fall(), Some(Side::White));
+    }
+
+    #[test]
+    fn flag_fall_draws_when_mate_is_impossible() {
+        use shakmaty::fen::Fen;
+        let mut session = timed_session();
+        session.position = "8/8/8/8/8/8/k1K5/8 w - - 0 1"
+            .parse::<Fen>()
+            .ok()
+            .and_then(|fen| fen.into_position::<Chess>(shakmaty::CastlingMode::Standard).ok())
+            .expect("bare kings");
+        session.clock = Some(ChessClock::resume(TimeControl::new(60, 0), 0, 60_000));
+        session.clock.as_mut().expect("clock").start(Side::White);
+        assert!(session.tick_clock());
+        assert!(matches!(session.outcome(), Some(shakmaty::KnownOutcome::Draw)));
+    }
+
+    #[test]
+    fn autosave_restores_the_clock_budget() {
+        let mut session = timed_session();
+        session.request_move(MoveRequest::new(Square::E2, Square::E4));
+        let saved = session.to_saved();
+        assert!(saved.clock_ms.is_some());
+        let restored = GameSession::from_saved(&saved).expect("restore");
+        let clock = restored.clock().expect("clock");
+        assert!(clock.remaining_ms(Side::White) <= 62_000);
+        assert_eq!(clock.remaining_ms(Side::Black), 60_000);
+    }
+
+    #[test]
+    fn untimed_session_has_no_clock() {
+        let session = session();
+        assert!(session.clock().is_none());
+        assert!(GameSession::new(GameConfig::default()).to_saved().clock_ms.is_none());
     }
 }

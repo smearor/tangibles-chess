@@ -5,9 +5,11 @@ mod commit_mode;
 mod game_config;
 mod opponent_kind;
 mod tangible_mode;
+mod time_control;
 
 pub use board_theme::BoardTheme;
 pub use commit_mode::CommitMode;
 pub use game_config::GameConfig;
 pub use opponent_kind::OpponentKind;
 pub use tangible_mode::TangibleMode;
+pub use time_control::TimeControl;

@@ -1,5 +1,6 @@
 //! MCP reply payloads - one `Serialize` type per tool response.
 
+mod clock;
 mod diagnostics;
 mod draw;
 mod game_state;
@@ -10,6 +11,7 @@ mod resign;
 mod screenshot;
 mod undo;
 
+pub use clock::ClockReply;
 pub use diagnostics::DiagnosticsReply;
 pub use draw::DrawReply;
 pub use game_state::GameStateReply;

@@ -28,6 +28,11 @@ pub struct SavedGame {
     pub resigned: Option<Side>,
     /// Whether a draw was agreed.
     pub agreed_draw: bool,
+    /// Banked clock budget in milliseconds (white, black) when the game
+    /// ran a chess clock; `None` for untimed games and saves predating
+    /// the clock.
+    #[serde(default)]
+    pub clock_ms: Option<[u64; 2]>,
 }
 
 impl SavedGame {
@@ -89,6 +94,7 @@ mod tests {
             sans: vec![San::from("e4"), San::from("e5")],
             resigned: None,
             agreed_draw: false,
+            clock_ms: None,
         };
         let parsed = SavedGame::from_toml(&saved.to_toml().expect("ser")).expect("de");
         assert_eq!(parsed, saved);
@@ -102,6 +108,7 @@ mod tests {
             sans: vec![],
             resigned: None,
             agreed_draw: false,
+            clock_ms: None,
         };
         let positions = saved.replay().expect("replay");
         assert_eq!(positions.len(), 4);
@@ -115,6 +122,7 @@ mod tests {
             sans: vec![],
             resigned: None,
             agreed_draw: false,
+            clock_ms: None,
         };
         assert!(saved.replay().is_err());
     }

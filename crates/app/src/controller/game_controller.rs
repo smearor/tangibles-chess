@@ -177,6 +177,7 @@ impl GameController {
         controller.borrow_mut().session.begin();
         controller.borrow_mut().sync_scene();
         controller.borrow_mut().spawn_engine_worker();
+        controller.borrow_mut().start_clock_timer();
         // An engine-controlled first mover starts thinking immediately.
         controller.borrow_mut().maybe_engine_move();
         if uses_tangibles {

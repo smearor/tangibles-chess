@@ -110,6 +110,7 @@ impl GameController {
         self.screen.surface.black_panel.set_play_enabled(play_enabled);
         self.screen.surface.white_panel.set_replay_mode(self.replay_index.is_some());
         self.screen.surface.black_panel.set_replay_mode(self.replay_index.is_some());
+        self.update_clock_labels();
         self.notify_mcp_state();
     }
 
@@ -125,7 +126,13 @@ impl GameController {
             return;
         }
         let (text, icon) = match self.session.outcome() {
-            Some(KnownOutcome::Decisive { winner }) => (self.l10n.msg(Side::from(winner).wins_key()), icon_names::TCH_TROPHY_SYMBOLIC),
+            Some(KnownOutcome::Decisive { winner }) => {
+                let mut text = self.l10n.msg(Side::from(winner).wins_key());
+                if self.session.flag_fall().is_some() {
+                    text = format!("{text} — {}", self.l10n.msg("game-wins-on-time"));
+                }
+                (text, icon_names::TCH_TROPHY_SYMBOLIC)
+            }
             Some(KnownOutcome::Draw) => {
                 // The overlay states the draw's rule (stalemate,
                 // repetition, material, agreement, ...) when known.

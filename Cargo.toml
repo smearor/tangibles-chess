@@ -45,6 +45,8 @@ glib = "0.22"
 cairo-rs = "0.22"
 gdk4 = "0.11"
 smearor-wrot-rotation = "0.2"
+# smearor commons (local path until published)
+smearor-commons-color = { path = "../smearor-commons/crates/color", features = ["cairo"] }
 # icons & fonts (git deps until 0.6 is published)
 fonts-rs-generator = { git = "https://github.com/smearor/fonts-rs.git" }
 fonts-rs-model = { git = "https://github.com/smearor/fonts-rs.git" }

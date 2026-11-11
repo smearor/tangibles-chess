@@ -11,12 +11,14 @@ use gtk4::subclass::prelude::*;
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
+use smearor_commons_color::Color;
 use tangibles_chess_config::BoardTheme;
 use tangibles_chess_geometry::FieldIndex;
 use tangibles_chess_material::Piece;
 
 use crate::theme::TextureLayout;
 use crate::theme::ThemePalette;
+use crate::theme::ThemeSlot;
 use crate::ui::parking_strip::ParkingStrip;
 
 /// Everything the scene needs to draw one frame.
@@ -173,6 +175,9 @@ mod imp {
             let cell = bs / 8.0;
             let state = self.state.borrow();
             let palette = ThemePalette::of(state.theme);
+            let light = palette.color(ThemeSlot::Light);
+            let dark = palette.color(ThemeSlot::Dark);
+            let frame_color = palette.color(ThemeSlot::Frame);
 
             // Board frame (the material border with coordinate inlay).
             // append_cairo clips to the given bounds but the context
@@ -183,7 +188,7 @@ mod imp {
                 (bs * 1.09) as f32,
                 (bs * 1.09) as f32,
             ));
-            frame.set_source_rgb(palette.frame.0, palette.frame.1, palette.frame.2);
+            frame_color.apply(&frame);
             frame.rectangle(bx - bs * 0.045, by - bs * 0.045, bs * 1.09, bs * 1.09);
             let _ = frame.fill();
 
@@ -192,12 +197,12 @@ mod imp {
             // right rotated 180° for the north player); files on the
             // bottom edge upright and on the top edge rotated, so each
             // player reads the labels on their own side.
-            let muted = (
-                (palette.light.0 + palette.frame.0) / 2.0 + 0.08,
-                (palette.light.1 + palette.frame.1) / 2.0 + 0.08,
-                (palette.light.2 + palette.frame.2) / 2.0 + 0.08,
+            let muted = Color::<f64>::new(
+                (light.r + frame_color.r) / 2.0 + 0.08,
+                (light.g + frame_color.g) / 2.0 + 0.08,
+                (light.b + frame_color.b) / 2.0 + 0.08,
             );
-            frame.set_source_rgb(muted.0, muted.1, muted.2);
+            muted.apply(&frame);
             let margin = bs * 0.045;
             let font = margin * 0.55;
             frame.set_font_size(font);
@@ -231,10 +236,10 @@ mod imp {
             for scene in 0..64usize {
                 let (row, col) = (scene / 8, scene % 8);
                 let square = scene_square(scene);
-                let base = if (row + col) % 2 == 0 { palette.light } else { palette.dark };
+                let base = if (row + col) % 2 == 0 { light } else { dark };
                 let x = bx + col as f64 * cell;
                 let y = by + row as f64 * cell;
-                squares.set_source_rgb(base.0, base.1, base.2);
+                base.apply(&squares);
                 squares.rectangle(x, y, cell, cell);
                 let _ = squares.fill();
 
@@ -260,49 +265,49 @@ mod imp {
 
                 // Layered highlights.
                 if state.last_move.is_some_and(|(from, to)| from == square || to == square) {
-                    fill_highlight(&squares, x, y, cell, palette.last_move, 0.28);
+                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::LastMove), 0.28);
                 }
                 if state.ceremony.contains(&square) {
-                    fill_highlight(&squares, x, y, cell, palette.ceremony, 0.35);
+                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Ceremony), 0.35);
                 }
                 if state.missing.contains(&square) {
-                    ring_highlight(&squares, x, y, cell, palette.check);
+                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check));
                 }
                 if state.foreign.contains(&square) || state.discrepant.contains(&square) {
-                    ring_highlight(&squares, x, y, cell, palette.target);
+                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Target));
                 }
                 if state.selected == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.selection, 0.30);
+                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection), 0.30);
                 }
                 if state.legal_targets.contains(&square) {
-                    target_dot(&squares, x, y, cell, palette.target);
+                    target_dot(&squares, x, y, cell, palette.color(ThemeSlot::Target));
                 }
                 if state.check == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.check, 0.45);
+                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check), 0.45);
                 }
                 if let Some(flash) = &state.illegal {
                     for (flashed, role) in &flash.squares {
                         if *flashed == square {
                             match role {
-                                FlashRole::Target => fill_highlight(&squares, x, y, cell, palette.check, 0.55),
+                                FlashRole::Target => fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check), 0.55),
                                 FlashRole::King => {
-                                    fill_highlight(&squares, x, y, cell, palette.check, 0.45);
-                                    ring_highlight(&squares, x, y, cell, palette.check);
+                                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check), 0.45);
+                                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check));
                                 }
-                                FlashRole::Attacker => ring_highlight(&squares, x, y, cell, palette.check),
+                                FlashRole::Attacker => ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check)),
                             }
                         }
                     }
                 }
                 if state.lifted == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.selection, 0.18);
+                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection), 0.18);
                 }
                 if state.pending == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.selection, 0.28);
-                    ring_highlight(&squares, x, y, cell, palette.selection);
+                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection), 0.28);
+                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection));
                 }
                 if state.ghost.is_some_and(|(_, to)| to == square) {
-                    ring_highlight(&squares, x, y, cell, palette.ceremony);
+                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Ceremony));
                 }
 
                 // Diagnostics: field index (top-left) and live contact
@@ -436,7 +441,7 @@ mod imp {
                     let ring = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
                     for square in captures {
                         let scene = square_scene(square);
-                        ring_highlight(&ring, bx + (scene % 8) as f64 * cell, by + (scene / 8) as f64 * cell, cell, palette.target);
+                        ring_highlight(&ring, bx + (scene % 8) as f64 * cell, by + (scene / 8) as f64 * cell, cell, palette.color(ThemeSlot::Target));
                     }
                 }
             }
@@ -556,13 +561,13 @@ fn parking_strip(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, strip: &P
     for (index, cell_state) in strip.cells().iter().enumerate() {
         let yy = y + index as f64 * cell;
         if cell_state.occupied {
-            cr.set_source_rgba(palette.target.0, palette.target.1, palette.target.2, 0.45);
+            palette.color(ThemeSlot::Target).apply_alpha(cr, 0.45);
         } else {
-            cr.set_source_rgba(palette.dark.0, palette.dark.1, palette.dark.2, 0.30);
+            palette.color(ThemeSlot::Dark).apply_alpha(cr, 0.30);
         }
         cr.rectangle(x, yy, cell, cell);
         let _ = cr.fill();
-        cr.set_source_rgba(palette.frame.0, palette.frame.1, palette.frame.2, 0.7);
+        palette.color(ThemeSlot::Frame).apply_alpha(cr, 0.7);
         cr.set_line_width(1.0);
         cr.rectangle(x + 0.5, yy + 0.5, cell - 1.0, cell - 1.0);
         let _ = cr.stroke();
@@ -635,15 +640,15 @@ fn decode_texture(bytes: &'static [u8]) -> Option<gtk4::cairo::ImageSurface> {
 }
 
 /// Soft filled highlight over one cell.
-fn fill_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: (f64, f64, f64), alpha: f64) {
-    cr.set_source_rgba(color.0, color.1, color.2, alpha);
+fn fill_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: Color<f64>, alpha: f64) {
+    color.apply_alpha(cr, alpha);
     cr.rectangle(x, y, cell, cell);
     let _ = cr.fill();
 }
 
 /// Ring outline inside a cell (missing/foreign/ghost).
-fn ring_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: (f64, f64, f64)) {
-    cr.set_source_rgba(color.0, color.1, color.2, 0.85);
+fn ring_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: Color<f64>) {
+    color.apply_alpha(cr, 0.85);
     cr.set_line_width((cell * 0.06).max(2.0));
     let inset = cell * 0.08;
     cr.rectangle(x + inset, y + inset, cell - inset * 2.0, cell - inset * 2.0);
@@ -651,8 +656,8 @@ fn ring_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: (
 }
 
 /// Legal-target dot.
-fn target_dot(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: (f64, f64, f64)) {
-    cr.set_source_rgba(color.0, color.1, color.2, 0.55);
+fn target_dot(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: Color<f64>) {
+    color.apply_alpha(cr, 0.55);
     let center = cell / 2.0;
     cr.arc(x + center, y + center, cell * 0.16, 0.0, std::f64::consts::TAU);
     let _ = cr.fill();

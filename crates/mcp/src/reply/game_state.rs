@@ -10,6 +10,8 @@ use tangibles_chess_notation::Uci;
 use tangibles_chess_session::DrawReason;
 use tangibles_chess_session::GameOutcome;
 
+use crate::reply::ClockReply;
+
 /// Snapshot of the running game (`game_state` tool).
 #[derive(Debug, Serialize)]
 pub struct GameStateReply {
@@ -29,4 +31,6 @@ pub struct GameStateReply {
     pub tangible_mode: TangibleMode,
     /// Draws claimable in the current position.
     pub claimable_draws: Vec<DrawReason>,
+    /// Chess-clock snapshot when the game is timed (FR-ENG-3).
+    pub clock: Option<ClockReply>,
 }

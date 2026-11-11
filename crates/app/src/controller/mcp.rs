@@ -16,6 +16,8 @@ use shakmaty::uci::UciMove;
 use std::cell::RefCell;
 use std::net::SocketAddr;
 use tangibles_chess_material::Role;
+use tangibles_chess_material::Side;
+use tangibles_chess_mcp::ClockReply;
 use tangibles_chess_mcp::CommandError;
 use tangibles_chess_mcp::CommandKind;
 use tangibles_chess_mcp::CommandReply;
@@ -235,6 +237,12 @@ impl GameController {
             outcome: self.session.outcome().map(GameOutcome::from),
             tangible_mode: config.tangible_mode,
             claimable_draws: self.session.claimable_draws(),
+            clock: self.session.clock().map(|clock| ClockReply {
+                white_ms: clock.remaining_ms(Side::White),
+                black_ms: clock.remaining_ms(Side::Black),
+                running: Side::ALL.into_iter().find(|side| clock.is_running(*side)),
+                flagged: clock.flagged(),
+            }),
         }
     }
 }

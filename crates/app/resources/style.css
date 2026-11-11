@@ -49,6 +49,28 @@
     opacity: 0.8;
 }
 
+/* Chess clock (FR-ENG-3) - serif face per the art direction, wide
+   enough that the countdown never resizes the panel. */
+.clock-label {
+    font-family: serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 38px;
+    font-weight: bold;
+    min-width: 170px;
+    padding: 0 8px;
+    opacity: 0.8;
+}
+
+.clock-label.running {
+    color: @accent_color;
+    opacity: 1.0;
+}
+
+.clock-label.flagged {
+    color: @error_color;
+    opacity: 1.0;
+}
+
 .control-button {
     min-width: 64px;
     min-height: 64px;

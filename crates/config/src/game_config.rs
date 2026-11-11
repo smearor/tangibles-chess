@@ -5,6 +5,7 @@ use crate::BoardTheme;
 use crate::CommitMode;
 use crate::OpponentKind;
 use crate::TangibleMode;
+use crate::TimeControl;
 use tangibles_chess_geometry::BoardOrientation;
 
 /// Static configuration chosen on the setup screen.
@@ -31,6 +32,8 @@ pub struct GameConfig {
     /// Whether players may take back and replay moves (undo/redo).
     #[serde(default = "default_true")]
     pub allow_undo: bool,
+    /// Chess-clock time control (FR-ENG-3); `None` = untimed game.
+    pub time_control: Option<TimeControl>,
 }
 
 /// Field default for `allow_undo` when loading older saved games that
@@ -51,6 +54,7 @@ impl Default for GameConfig {
             sound_enabled: true,
             require_placement: true,
             allow_undo: true,
+            time_control: None,
         }
     }
 }

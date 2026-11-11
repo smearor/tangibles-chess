@@ -75,8 +75,12 @@ This closes M2.
    like `Human`, moves arrive via MCP `make_move`); the setup picker
    is un-greyed. `engine_path` in `settings.toml` (default
    `stockfish`).
-2. **Chess clocks (FR-ENG-3)** — increment/fixed, per-edge display;
-   pairs naturally with the engine.
+2. **Chess clocks (FR-ENG-3)** ✅ — `TimeControl` (fixed/Fischer
+   increment) preset picker in setup; session-owned `ChessClock`
+   presses on applied moves, flag fall ends decisive or drawn
+   (insufficient mating material); remaining budgets persist through
+   `SavedGame`; per-edge serif clock labels tick on a 100 ms GTK
+   timer (tenths under 10 s); MCP `game_state` exposes the snapshot.
 3. **Sound assets + missing cues (FR-ART-4, FR-SND-1)** —
    `assets/sounds/*.ogg` into the gresource; add castle, promotion and
    error variants to `SoundEffect`.
