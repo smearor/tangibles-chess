@@ -810,7 +810,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-cuernavaca"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#bb17e483244a7dda47beb47fc50033a62eb547d1"
+source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
 dependencies = [
  "const_format",
  "fonts-rs-generator",
@@ -826,7 +826,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-generator"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#bb17e483244a7dda47beb47fc50033a62eb547d1"
+source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
 dependencies = [
  "font-types",
  "fonts-rs-model",
@@ -845,7 +845,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-lucide"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#bb17e483244a7dda47beb47fc50033a62eb547d1"
+source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
 dependencies = [
  "const_format",
  "fonts-rs-generator",
@@ -860,7 +860,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-model"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#bb17e483244a7dda47beb47fc50033a62eb547d1"
+source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
 dependencies = [
  "base64 0.23.1",
  "gio",
@@ -874,7 +874,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-tabler"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#bb17e483244a7dda47beb47fc50033a62eb547d1"
+source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
 dependencies = [
  "const_format",
  "fonts-rs-generator",
@@ -2869,6 +2869,7 @@ checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 [[package]]
 name = "smearor-commons-color"
 version = "0.1.0"
+source = "git+https://github.com/smearor/smearor-commons.git#b23bdcabdd76770d5679ca4b43992ab3f061f5ee"
 dependencies = [
  "cairo-rs",
  "serde",
