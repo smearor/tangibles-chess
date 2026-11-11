@@ -26,6 +26,7 @@ cairo-rs.workspace = true
 gdk4.workspace = true
 smearor-wrot-rotation.workspace = true
 smearor-commons-color.workspace = true
+smearor-commons-geometry.workspace = true
 fonts-rs-cuernavaca.workspace = true
 fluent.workspace = true
 fluent-langneg.workspace = true

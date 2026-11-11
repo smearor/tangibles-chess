@@ -2877,6 +2877,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "smearor-commons-geometry"
+version = "0.1.0"
+source = "git+https://github.com/smearor/smearor-commons.git#8b64db3a118dc3b7d1be0cb5e2d2b986a625cd6e"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "smearor-wrot-rotation"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3038,7 +3047,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#dabcbcc3d7430f3b39b865d7b18fe699fc1de921"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#a0fc4a2e1edd9f0f147b38d85a743494fad2ec90"
 dependencies = [
  "serde",
  "serde-jsonlines",
@@ -3050,7 +3059,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#dabcbcc3d7430f3b39b865d7b18fe699fc1de921"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#a0fc4a2e1edd9f0f147b38d85a743494fad2ec90"
 dependencies = [
  "cynic",
  "futures",
@@ -3071,11 +3080,12 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#dabcbcc3d7430f3b39b865d7b18fe699fc1de921"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#a0fc4a2e1edd9f0f147b38d85a743494fad2ec90"
 dependencies = [
  "cynic",
  "serde",
  "serde_json",
+ "smearor-commons-geometry",
  "thiserror 2.0.21",
  "toml 0.8.23",
 ]
@@ -3100,6 +3110,7 @@ dependencies = [
  "shakmaty",
  "signal-hook",
  "smearor-commons-color",
+ "smearor-commons-geometry",
  "smearor-wrot-rotation",
  "tangibles-chess-config",
  "tangibles-chess-engine",
@@ -3231,6 +3242,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shakmaty",
+ "smearor-commons-geometry",
  "tangible-objects-client",
  "tangible-objects-model",
  "tangibles-chess-config",

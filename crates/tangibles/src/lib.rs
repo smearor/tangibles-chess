@@ -62,9 +62,6 @@ pub use zone_action::ZoneAction;
 /// have to depend on `tangible-objects-model` directly.
 pub use tangible_objects_model::FieldSet;
 
-/// The millimetre unit of the field-set geometry domain.
-pub use tangible_objects_model::Millimeters;
-
 /// The contact-count domain type, re-exported so callers do not have
 /// to depend on `tangible-objects-model` directly.
 pub use tangible_objects_model::ContactCount;

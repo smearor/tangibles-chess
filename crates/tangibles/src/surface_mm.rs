@@ -1,6 +1,6 @@
 //! The touch surface's size in millimetres.
 
-use tangible_objects_model::Millimeters;
+use smearor_commons_geometry::Millimeters;
 
 /// Overall window (screen) size in screen mm - the bounds every field
 /// set is built against and clipped into.

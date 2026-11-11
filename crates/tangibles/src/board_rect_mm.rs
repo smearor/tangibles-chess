@@ -1,6 +1,6 @@
 //! The board rectangle in screen millimetres.
 
-use tangible_objects_model::Millimeters;
+use smearor_commons_geometry::Millimeters;
 
 /// The board rectangle in screen mm - the field-set geometry domain:
 /// `x`/`y` = top-left corner, `side` = edge length.

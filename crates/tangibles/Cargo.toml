@@ -16,6 +16,7 @@ tangibles-chess-moves.workspace = true
 shakmaty.workspace = true
 tangible-objects-client.workspace = true
 tangible-objects-model.workspace = true
+smearor-commons-geometry.workspace = true
 tokio.workspace = true
 serde_json.workspace = true
 serde.workspace = true

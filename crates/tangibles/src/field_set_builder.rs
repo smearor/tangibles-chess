@@ -1,12 +1,12 @@
 use crate::BoardRectMm;
 use crate::SurfaceMm;
 use crate::TableEdge;
+use smearor_commons_geometry::Millimeters;
 use tangible_objects_model::Field;
 use tangible_objects_model::FieldName;
 use tangible_objects_model::FieldSet;
 use tangible_objects_model::FieldSetName;
 use tangible_objects_model::FrameCount;
-use tangible_objects_model::Millimeters;
 use tangible_objects_model::Region;
 
 /// Builds the chess [`FieldSet`] from board geometry in screen

@@ -47,6 +47,7 @@ gdk4 = "0.11"
 smearor-wrot-rotation = "0.2"
 # smearor commons (local path until published)
 smearor-commons-color = { git = "https://github.com/smearor/smearor-commons.git", features = ["cairo"] }
+smearor-commons-geometry = { git = "https://github.com/smearor/smearor-commons.git" }
 # icons & fonts (git deps until 0.6 is published)
 fonts-rs-generator = { git = "https://github.com/smearor/fonts-rs.git" }
 fonts-rs-model = { git = "https://github.com/smearor/fonts-rs.git" }
