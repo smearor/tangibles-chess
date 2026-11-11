@@ -1,0 +1,39 @@
+p:documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - CHANGELOG.md
+          - CODE_OF_CONDUCT.md
+          - README.md
+          - SECURITY.md
+          - "crates/*/README.md"
+          - book/**
+          - .github/workflows/docs.yml
+          - .github/workflows/book.yml
+p:continuous-integration:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/workflows/**
+          - .github/dependabot.yml
+          - .github/labeler.yml
+          - .github/labels.yml
+p:distribution:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/workflows/release.yml
+p:build-system:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/*/build.rs"
+          - .github/workflows/msrv.yml
+p:dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Cargo.toml
+          - Cargo.lock
+          - "crates/*/Cargo.toml"
+          - .github/workflows/dependabot-approve-and-auto-merge.yml
+p:fonts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/fonts-rs-*/**"
+          - "crates/nerd-fonts-*/**"
