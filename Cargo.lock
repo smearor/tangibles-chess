@@ -696,7 +696,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1138,7 +1138,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 9.0.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2254,7 +2254,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2869,7 +2869,7 @@ checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 [[package]]
 name = "smearor-commons-color"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#b23bdcabdd76770d5679ca4b43992ab3f061f5ee"
+source = "git+https://github.com/smearor/smearor-commons.git#015b56811a0af9a479c532889cec1ac615a0256a"
 dependencies = [
  "cairo-rs",
  "serde",
@@ -2879,7 +2879,7 @@ dependencies = [
 [[package]]
 name = "smearor-commons-geometry"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#8b64db3a118dc3b7d1be0cb5e2d2b986a625cd6e"
+source = "git+https://github.com/smearor/smearor-commons.git#015b56811a0af9a479c532889cec1ac615a0256a"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -3154,6 +3154,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "shakmaty",
+ "smearor-commons-geometry",
 ]
 
 [[package]]

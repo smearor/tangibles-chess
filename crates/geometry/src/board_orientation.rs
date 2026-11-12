@@ -2,12 +2,14 @@ use crate::FieldIndex;
 use crate::SceneIndex;
 use serde::Deserialize;
 use serde::Serialize;
+use smearor_commons_geometry::QuarterTurn;
 
 /// Orientation of the rendered board on the tabletop screen.
 ///
 /// Snapped quarter-turns applied by the `RotationWidget`; the value says
 /// where the white home edge sits relative to the physical south edge of
-/// the screen.
+/// the screen. The rotation algebra delegates to [`QuarterTurn`]; this
+/// enum carries the grid semantics (`scene_index`) and the wire shape.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BoardOrientation {
     /// White home rank faces the physical south edge.
@@ -27,32 +29,17 @@ impl BoardOrientation {
 
     /// The orientation rotated by one quarter-turn clockwise.
     pub fn clockwise(self) -> Self {
-        match self {
-            Self::Deg0 => Self::Deg90,
-            Self::Deg90 => Self::Deg180,
-            Self::Deg180 => Self::Deg270,
-            Self::Deg270 => Self::Deg0,
-        }
+        QuarterTurn::from(self).clockwise().into()
     }
 
     /// The orientation rotated by one quarter-turn counter-clockwise.
     pub fn counter_clockwise(self) -> Self {
-        match self {
-            Self::Deg0 => Self::Deg270,
-            Self::Deg90 => Self::Deg0,
-            Self::Deg180 => Self::Deg90,
-            Self::Deg270 => Self::Deg180,
-        }
+        QuarterTurn::from(self).counter_clockwise().into()
     }
 
     /// Rotation angle in degrees.
     pub fn degrees(self) -> u16 {
-        match self {
-            Self::Deg0 => 0,
-            Self::Deg90 => 90,
-            Self::Deg180 => 180,
-            Self::Deg270 => 270,
-        }
+        QuarterTurn::from(self).degrees() as u16
     }
 
     /// Maps a physical screen field to the canonical scene index it
@@ -66,6 +53,31 @@ impl BoardOrientation {
             Self::Deg270 => index.rot_cw(),
         };
         rotated.into()
+    }
+}
+
+/// The board orientation as a technical [`QuarterTurn`].
+impl From<BoardOrientation> for QuarterTurn {
+    fn from(orientation: BoardOrientation) -> Self {
+        match orientation {
+            BoardOrientation::Deg0 => Self::Deg0,
+            BoardOrientation::Deg90 => Self::Deg90,
+            BoardOrientation::Deg180 => Self::Deg180,
+            BoardOrientation::Deg270 => Self::Deg270,
+        }
+    }
+}
+
+/// A technical [`QuarterTurn`] as a board orientation (identical
+/// rotation, different domain semantics).
+impl From<QuarterTurn> for BoardOrientation {
+    fn from(turn: QuarterTurn) -> Self {
+        match turn {
+            QuarterTurn::Deg0 => Self::Deg0,
+            QuarterTurn::Deg90 => Self::Deg90,
+            QuarterTurn::Deg180 => Self::Deg180,
+            QuarterTurn::Deg270 => Self::Deg270,
+        }
     }
 }
 
@@ -109,13 +121,14 @@ mod tests {
     #[test]
     fn scene_index_is_a_bijection() {
         use crate::FieldIndex;
-        use std::collections::BTreeSet;
         for orientation in BoardOrientation::ALL {
-            let mapped: BTreeSet<usize> = (0..64)
-                .filter_map(FieldIndex::new)
-                .map(|index| orientation.scene_index(index).as_usize())
-                .collect();
-            assert_eq!(mapped.len(), 64);
+            let mut seen = [false; 64];
+            for i in 0..64 {
+                let index = FieldIndex::new(i).expect("in range");
+                let mapped = orientation.scene_index(index).as_usize();
+                assert!(!seen[mapped], "collision at {mapped}");
+                seen[mapped] = true;
+            }
         }
     }
 }

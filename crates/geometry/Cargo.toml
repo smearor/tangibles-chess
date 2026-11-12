@@ -10,4 +10,5 @@ description = "Board index spaces and orientation for tangibles-chess (field/sce
 
 [dependencies]
 shakmaty.workspace = true
+smearor-commons-geometry.workspace = true
 serde.workspace = true
