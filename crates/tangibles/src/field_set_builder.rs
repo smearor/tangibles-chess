@@ -2,6 +2,9 @@ use crate::BoardRectMm;
 use crate::SurfaceMm;
 use crate::TableEdge;
 use smearor_commons_geometry::Millimeters;
+use smearor_commons_geometry::Rect;
+use smearor_commons_geometry::Vec2;
+use tangibles_chess_geometry::BOARD_GRID;
 use tangible_objects_model::Field;
 use tangible_objects_model::FieldName;
 use tangible_objects_model::FieldSet;
@@ -89,16 +92,12 @@ impl FieldSetBuilder {
     /// The 64 board cells `f0`..`f63`, row-major from the board's
     /// top-left corner.
     fn board_fields(&self, layout: &Layout) -> Vec<Field> {
+        let frame = Rect::<Millimeters, f64>::new(Vec2::new(layout.bx.as_f64(), layout.by.as_f64()), Vec2::new(layout.bs.as_f64(), layout.bs.as_f64()));
         (0..64)
-            .map(|index| {
-                let (row, col) = (index / 8, index % 8);
-                Self::field(
-                    format!("f{index}"),
-                    layout.bx + layout.cell * col as f64,
-                    layout.by + layout.cell * row as f64,
-                    layout.bx + layout.cell * (col + 1) as f64,
-                    layout.by + layout.cell * (row + 1) as f64,
-                )
+            .filter_map(|index| {
+                let cell = BOARD_GRID.cell(index)?;
+                let rect = BOARD_GRID.rect_within(cell, frame);
+                Some(Self::field(format!("f{index}"), rect.min.x.into(), rect.min.y.into(), rect.right().into(), rect.bottom().into()))
             })
             .collect()
     }

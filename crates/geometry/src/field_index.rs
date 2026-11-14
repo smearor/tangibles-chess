@@ -1,5 +1,14 @@
 //! A physical screen-grid position.
 
+use smearor_commons_geometry::Cell;
+use smearor_commons_geometry::Col;
+use smearor_commons_geometry::Grid;
+use smearor_commons_geometry::QuarterTurn;
+use smearor_commons_geometry::Row;
+
+/// The board's fixed 8×8 partition — physical screen space, row-major.
+pub const BOARD_GRID: Grid = Grid::new(8, 8);
+
 /// A physical screen-grid position `0..63` - row-major from the board
 /// rectangle's top-left corner (the daemon's `f{index}` fields).
 ///
@@ -25,29 +34,48 @@ impl FieldIndex {
         self.0
     }
 
+    /// The [`Cell`] of this field in [`BOARD_GRID`].
+    ///
+    /// `index < COUNT` is the type invariant, so the row-major split is
+    /// total here — [`Grid::cell`] is only partial because it accepts
+    /// unbounded indices.
+    pub fn cell(self) -> Cell {
+        Cell::new(Col(self.0 as u32 % BOARD_GRID.cols()), Row(self.0 as u32 / BOARD_GRID.cols()))
+    }
+
     /// Row (`0` = top of the screen).
     pub fn row(self) -> usize {
-        self.0 / Self::ROW
+        self.cell().row.0 as usize
     }
 
     /// Column (`0` = left of the screen).
     pub fn col(self) -> usize {
-        self.0 % Self::ROW
+        self.cell().col.0 as usize
+    }
+
+    /// The field rotated by `turn` within [`BOARD_GRID`].
+    ///
+    /// Rotation permutes cells inside the transposed grid; on the
+    /// square board the rotated cell is always in range, so mapping
+    /// back to a linear index is total.
+    pub fn rotated(self, turn: QuarterTurn) -> Self {
+        let cell = self.cell().rotated(turn, &BOARD_GRID);
+        Self(cell.row.0 as usize * Self::ROW + cell.col.0 as usize)
     }
 
     /// One quarter-turn clockwise (screen space).
     pub fn rot_cw(self) -> Self {
-        Self(self.col() * Self::ROW + (Self::ROW - 1 - self.row()))
+        self.rotated(QuarterTurn::Deg90)
     }
 
     /// One quarter-turn counter-clockwise (the inverse of `rot_cw`).
     pub fn rot_ccw(self) -> Self {
-        Self((Self::ROW - 1 - self.col()) * Self::ROW + self.row())
+        self.rotated(QuarterTurn::Deg270)
     }
 
     /// A half-turn (180°).
     pub fn rot_180(self) -> Self {
-        Self(Self::COUNT - 1 - self.0)
+        self.rotated(QuarterTurn::Deg180)
     }
 }
 
@@ -83,6 +111,17 @@ mod tests {
             assert_eq!(index.rot_ccw().rot_cw(), index);
             assert_eq!(index.rot_180().rot_180(), index);
             assert_eq!(index.rot_cw().rot_cw(), index.rot_180());
+        }
+    }
+
+    #[test]
+    fn cell_round_trips_through_row_and_col() {
+        for index in 0..FieldIndex::COUNT {
+            let index = FieldIndex::new(index).expect("in range");
+            let cell = index.cell();
+            assert_eq!(index.row(), cell.row.0 as usize);
+            assert_eq!(index.col(), cell.col.0 as usize);
+            assert_eq!(index.as_usize(), index.row() * FieldIndex::ROW + index.col());
         }
     }
 

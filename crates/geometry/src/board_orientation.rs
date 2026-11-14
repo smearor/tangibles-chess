@@ -46,13 +46,7 @@ impl BoardOrientation {
     /// currently holds under this orientation: the orientation's
     /// inverse rotation applied to the field index.
     pub fn scene_index(self, index: FieldIndex) -> SceneIndex {
-        let rotated = match self {
-            Self::Deg0 => index,
-            Self::Deg90 => index.rot_ccw(),
-            Self::Deg180 => index.rot_180(),
-            Self::Deg270 => index.rot_cw(),
-        };
-        rotated.into()
+        index.rotated(QuarterTurn::from(self).inverse()).into()
     }
 }
 

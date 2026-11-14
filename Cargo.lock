@@ -251,9 +251,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.20.3"
+version = "3.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
+checksum = "87a0cf66fd1eb2fb7b822cb78370d82303750809bc6ba855f3f58e517d3238db"
 
 [[package]]
 name = "bytemuck"
@@ -306,9 +306,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.11.1"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ff2a8126fff0f8c839080d619675a585e61720bb12d2baceae45769fd66f155"
+checksum = "33ef9e3e8154a45c7a95cff4c1299702106ad94062d7bb85fdc5d3a5afd91d45"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -316,9 +316,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-expr"
-version = "0.20.10"
+version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ba9e9ec16c447027685b1f897b720e18e9a8afd00bd7332c483537e38086c9f"
+checksum = "edd44d82755fb9210fb10d9daf8dd7e522da0efe1d5f263cffc5db07725663ff"
 dependencies = [
  "smallvec",
  "target-lexicon",
@@ -691,12 +691,12 @@ checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "errno"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -810,7 +810,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-cuernavaca"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
+source = "git+https://github.com/smearor/fonts-rs.git#cf10dd9350fdc62572c15701b105fc1b824f1706"
 dependencies = [
  "const_format",
  "fonts-rs-generator",
@@ -826,7 +826,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-generator"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
+source = "git+https://github.com/smearor/fonts-rs.git#cf10dd9350fdc62572c15701b105fc1b824f1706"
 dependencies = [
  "font-types",
  "fonts-rs-model",
@@ -845,7 +845,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-lucide"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
+source = "git+https://github.com/smearor/fonts-rs.git#cf10dd9350fdc62572c15701b105fc1b824f1706"
 dependencies = [
  "const_format",
  "fonts-rs-generator",
@@ -860,7 +860,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-model"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
+source = "git+https://github.com/smearor/fonts-rs.git#cf10dd9350fdc62572c15701b105fc1b824f1706"
 dependencies = [
  "base64 0.23.1",
  "gio",
@@ -874,7 +874,7 @@ dependencies = [
 [[package]]
 name = "fonts-rs-tabler"
 version = "0.6.0"
-source = "git+https://github.com/smearor/fonts-rs.git#1a0d48afb137d04a1f91748dab369ea957b10bee"
+source = "git+https://github.com/smearor/fonts-rs.git#cf10dd9350fdc62572c15701b105fc1b824f1706"
 dependencies = [
  "const_format",
  "fonts-rs-generator",
@@ -1138,7 +1138,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 9.0.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1922,9 +1922,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "1.2.4"
+version = "1.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1788edb87fdc09c7e26304471e2f5be8cdefb1b6930d6e3985fc02ff53bf86ee"
+checksum = "20521a903f02b0a573cd6840e9d0a5a0cc043d361fe924092cd70f8556cc9c4a"
 dependencies = [
  "libc",
  "wasi",
@@ -2254,7 +2254,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2456,9 +2456,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp"
-version = "3.9.0"
+version = "3.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d24a7e92f4bcaa36b97fa93c4fa7ca8f3e669eced949345b3462dba333c7f909"
+checksum = "b5949e504d5ab9944a168259afc0c39ac0230627b6ec5367ace194c59bcbe163"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -2490,9 +2490,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp-macros"
-version = "3.9.0"
+version = "3.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3140f24a766f80f9ec1607bde85680959a69b83d46fa9ce87dadab7e67ab029"
+checksum = "b98a686693ee91b665c6f89f182fca6e141c8a63dc113b11b38c1bf3491606b7"
 dependencies = [
  "darling 0.24.1",
  "proc-macro2",
@@ -2537,7 +2537,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.16",
+ "rustls-webpki 0.103.17",
  "subtle",
  "zeroize",
 ]
@@ -2564,9 +2564,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.16"
+version = "0.103.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
+checksum = "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -2792,9 +2792,9 @@ dependencies = [
 
 [[package]]
 name = "shakmaty"
-version = "0.30.0"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41cef923c4ad8bf68e6f52a3091499108b8fec71ea8c4ba27d1acfb263f53241"
+checksum = "d465a6a07031a8c60d92dc9b656cc8f59f8c1640493576d5d88f898883b4bd67"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -2869,7 +2869,7 @@ checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 [[package]]
 name = "smearor-commons-color"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#015b56811a0af9a479c532889cec1ac615a0256a"
+source = "git+https://github.com/smearor/smearor-commons.git#23aa30e69951e326066a5d3f6fb951ae8b2af8ef"
 dependencies = [
  "cairo-rs",
  "serde",
@@ -2879,7 +2879,7 @@ dependencies = [
 [[package]]
 name = "smearor-commons-geometry"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#015b56811a0af9a479c532889cec1ac615a0256a"
+source = "git+https://github.com/smearor/smearor-commons.git#23aa30e69951e326066a5d3f6fb951ae8b2af8ef"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -2887,9 +2887,9 @@ dependencies = [
 
 [[package]]
 name = "smearor-wrot-rotation"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64091d85d3b3d4beef3ca55e4832ace9b1b25d0dd3a05fc715c04ac0ebfe2170"
+checksum = "a4d8ae51ae9bcb1e0498b8ebb56f34957e61d747bca6342a533b08e7e0942b09"
 dependencies = [
  "glib",
  "gtk4",
@@ -3047,11 +3047,12 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#a0fc4a2e1edd9f0f147b38d85a743494fad2ec90"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#3c19407080cf1a4e3c5dccb434a9a8b596f8d5ca"
 dependencies = [
  "serde",
  "serde-jsonlines",
  "serde_json",
+ "smearor-commons-geometry",
  "tangible-objects-model",
  "thiserror 2.0.21",
 ]
@@ -3059,7 +3060,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#a0fc4a2e1edd9f0f147b38d85a743494fad2ec90"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#3c19407080cf1a4e3c5dccb434a9a8b596f8d5ca"
 dependencies = [
  "cynic",
  "futures",
@@ -3069,6 +3070,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "smearor-commons-geometry",
  "tangible-objects-analysis",
  "tangible-objects-model",
  "thiserror 2.0.21",
@@ -3080,11 +3082,12 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#a0fc4a2e1edd9f0f147b38d85a743494fad2ec90"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#3c19407080cf1a4e3c5dccb434a9a8b596f8d5ca"
 dependencies = [
  "cynic",
  "serde",
  "serde_json",
+ "smearor-commons-color",
  "smearor-commons-geometry",
  "thiserror 2.0.21",
  "toml 0.8.23",

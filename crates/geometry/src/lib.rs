@@ -6,5 +6,6 @@ mod field_index;
 mod scene_index;
 
 pub use board_orientation::BoardOrientation;
+pub use field_index::BOARD_GRID;
 pub use field_index::FieldIndex;
 pub use scene_index::SceneIndex;
