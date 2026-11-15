@@ -31,6 +31,7 @@ use crate::settings::AppSettings;
 use crate::sound::SoundPlayer;
 use crate::tangible_host::TangibleHost;
 use crate::ui::game_screen::GameScreen;
+use crate::ui::generation_counter::GenerationCounter;
 use crate::ui::parking_strip::ParkingStrip;
 
 /// Live state of the whole game - the glue between `GameSession`
@@ -81,7 +82,7 @@ pub struct GameController {
     /// Whether the game-over overlay was already shown.
     pub(super) result_shown: bool,
     /// Generation counter for the illegal-move flash.
-    pub(super) illegal_seq: u64,
+    pub(super) illegal_seq: GenerationCounter,
     /// Last rejected tangible move (`from`, `to`): the physical marker
     /// is misplaced; a lift+place back onto `from` is accepted quietly.
     pub(super) rejected_move: Option<MoveRequest>,
@@ -146,7 +147,7 @@ impl GameController {
             parked_west: ParkingStrip::default(),
             parked_east: ParkingStrip::default(),
             result_shown: false,
-            illegal_seq: 0,
+            illegal_seq: GenerationCounter::default(),
             rejected_move: None,
             undo_guided: false,
             diagnostics: false,
