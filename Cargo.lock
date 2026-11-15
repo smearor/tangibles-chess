@@ -696,7 +696,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1138,7 +1138,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 9.0.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2254,7 +2254,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3048,7 +3048,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#cbd1c35dc2a892a6ccf1ff611350bad2f2e0666b"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#8dcea031b2a318ea76196636dacf84c3e0ef28e3"
 dependencies = [
  "serde",
  "serde-jsonlines",
@@ -3061,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#cbd1c35dc2a892a6ccf1ff611350bad2f2e0666b"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#8dcea031b2a318ea76196636dacf84c3e0ef28e3"
 dependencies = [
  "cynic",
  "futures",
@@ -3083,7 +3083,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#cbd1c35dc2a892a6ccf1ff611350bad2f2e0666b"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#8dcea031b2a318ea76196636dacf84c3e0ef28e3"
 dependencies = [
  "cynic",
  "serde",
