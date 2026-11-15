@@ -1,10 +1,9 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-
+use tangible_objects_model::DeviceInfo;
 use tangible_objects_model::FieldSet;
 
 use crate::DaemonError;
-use crate::DeviceInfo;
 use crate::FIELD_SET_NAME;
 use crate::FieldEvent;
 use crate::FieldEventKind;

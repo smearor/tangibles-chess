@@ -1,3 +1,4 @@
+use tangible_objects_model::DeviceInfo;
 use tangibles_chess_tangibles::DaemonError;
 use tangibles_chess_tangibles::GraphQlSource;
 use tangibles_chess_tangibles::TangibleSource;
@@ -35,7 +36,7 @@ impl TangibleHost {
     }
 
     /// Queries device calibration.
-    pub fn device_info(&self, source: &GraphQlSource) -> Result<tangibles_chess_tangibles::DeviceInfo, DaemonError> {
+    pub fn device_info(&self, source: &GraphQlSource) -> Result<DeviceInfo, DaemonError> {
         self.runtime.block_on(source.device_info())
     }
 

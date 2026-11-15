@@ -1,9 +1,8 @@
 use std::future::Future;
-
+use tangible_objects_model::DeviceInfo;
 use tangible_objects_model::FieldSet;
 
 use crate::DaemonError;
-use crate::DeviceInfo;
 use crate::FieldEvent;
 use crate::TouchPoint;
 
