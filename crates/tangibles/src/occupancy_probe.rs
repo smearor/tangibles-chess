@@ -2,12 +2,12 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use tangible_objects_model::ContactCount;
+use tangible_objects_model::TouchPoint;
 use tangibles_chess_geometry::FieldIndex;
 
 use crate::FieldEvent;
 use crate::FieldEventKind;
 use crate::FieldName;
-use crate::TouchPoint;
 use crate::Zone;
 
 /// Live view of which board fields are physically occupied.
@@ -128,9 +128,9 @@ mod tests {
     use crate::FieldEvent;
     use crate::FieldEventKind;
     use crate::FieldName;
-    use crate::TouchPoint;
     use crate::Zone;
     use tangible_objects_model::ContactCount;
+    use tangible_objects_model::TouchPoint;
 
     fn event(kind: FieldEventKind, field: &str, count: Option<ContactCount>) -> FieldEvent {
         FieldEvent {
@@ -169,19 +169,19 @@ mod tests {
         let mut probe = OccupancyProbe::default();
         let touches = [
             TouchPoint {
-                slot: 0,
-                tracking_id: 1,
-                pos: crate::ContactPos { x: 90.0, y: 90.0 },
+                slot: 0.into(),
+                tracking_id: 1.into(),
+                pos: Vec2::new(90.0, 90.0),
             },
             TouchPoint {
-                slot: 1,
-                tracking_id: 2,
-                pos: crate::ContactPos { x: 715.0, y: 715.0 },
+                slot: 1.into(),
+                tracking_id: 2.into(),
+                pos: Vec2::new(715.0, 715.0),
             },
             TouchPoint {
-                slot: 2,
-                tracking_id: 3,
-                pos: crate::ContactPos { x: 400.0, y: 790.0 }, // below the board - not a field
+                slot: 2.into(),
+                tracking_id: 3.into(),
+                pos: Vec2::new(400.0, 790.0), // below the board - not a field
             },
         ];
         probe.refresh(&touches, (80.0, 80.0, 640.0));

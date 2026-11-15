@@ -18,10 +18,10 @@ use tangibles_chess_tangibles::TableEdge;
 use super::game_controller::GameController;
 use super::registry::with_controller;
 use crate::playable::Playable;
-use crate::ui::chess_scene::FlashRole;
-use crate::ui::chess_scene::IllegalFlash;
 use crate::ui::confirm_card::ConfirmCard;
+use crate::ui::flash_role::FlashRole;
 use crate::ui::game_result::GameResult;
+use crate::ui::illegal_flash::IllegalFlash;
 use crate::ui::promotion_picker::PromotionPicker;
 
 /// How long a rejected move's squares flash red (ms).
@@ -178,7 +178,7 @@ impl GameController {
     /// when the naive move would have left the own king in check, the
     /// threatened king and its attackers.
     pub(super) fn flash_illegal(&mut self, request: MoveRequest) {
-        self.illegal_seq += 1;
+        self.illegal_seq = self.illegal_seq.next();
         let seq = self.illegal_seq;
         let mut squares = vec![(request.to, FlashRole::Target)];
         if let Some(projection) = self.session.projected_check(&request) {

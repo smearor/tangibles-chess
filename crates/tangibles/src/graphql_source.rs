@@ -2,19 +2,19 @@ use futures_lite::StreamExt;
 use tangible_objects_client::ClientError;
 use tangible_objects_client::Endpoint;
 use tangible_objects_client::GraphQLClient;
+use tangible_objects_model::DeviceInfo;
 use tangible_objects_model::FieldSet;
 use tangible_objects_model::FieldSetName;
 use tangible_objects_model::Lifetime;
 use tangible_objects_model::Owner;
 use tangible_objects_model::RegisterFieldSetResult;
+use tangible_objects_model::TouchPoint;
 use tracing::debug;
 use tracing::warn;
 
 use crate::DaemonError;
-use crate::DeviceInfo;
 use crate::FieldEvent;
 use crate::TangibleSource;
-use crate::TouchPoint;
 
 /// Tangible source backed by the `tangible-objects` daemon.
 ///
@@ -78,12 +78,11 @@ impl TangibleSource for GraphQlSource {
         self.client
             .device_info()
             .await?
-            .map(DeviceInfo::from)
             .ok_or_else(|| DaemonError::Unavailable("daemon reports no device info".to_string()))
     }
 
     async fn touch_points(&self) -> Result<Vec<TouchPoint>, DaemonError> {
-        Ok(self.client.touch_points().await?.iter().map(TouchPoint::from).collect())
+        Ok(self.client.touch_points().await?)
     }
 
     async fn register_field_set(&self, spec: &FieldSet) -> Result<(), DaemonError> {

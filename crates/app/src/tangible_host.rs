@@ -1,4 +1,6 @@
 use tangible_objects_model::DeviceInfo;
+use tangible_objects_model::FieldSet;
+use tangible_objects_model::TouchPoint;
 use tangibles_chess_tangibles::DaemonError;
 use tangibles_chess_tangibles::GraphQlSource;
 use tangibles_chess_tangibles::TangibleSource;
@@ -31,7 +33,7 @@ impl TangibleHost {
     }
 
     /// Registers the chess field set on the daemon.
-    pub fn register(&self, source: &GraphQlSource, spec: &tangibles_chess_tangibles::FieldSet) -> Result<(), DaemonError> {
+    pub fn register(&self, source: &GraphQlSource, spec: &FieldSet) -> Result<(), DaemonError> {
         self.runtime.block_on(source.register_field_set(spec))
     }
 
@@ -41,7 +43,7 @@ impl TangibleHost {
     }
 
     /// Queries live touch points (occupancy resync).
-    pub fn touch_points(&self, source: &GraphQlSource) -> Result<Vec<tangibles_chess_tangibles::TouchPoint>, DaemonError> {
+    pub fn touch_points(&self, source: &GraphQlSource) -> Result<Vec<TouchPoint>, DaemonError> {
         self.runtime.block_on(source.touch_points())
     }
 

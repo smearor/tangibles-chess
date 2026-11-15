@@ -19,6 +19,8 @@ use tangibles_chess_material::Piece;
 use crate::theme::TextureLayout;
 use crate::theme::ThemePalette;
 use crate::theme::ThemeSlot;
+use crate::ui::flash_role::FlashRole;
+use crate::ui::illegal_flash::IllegalFlash;
 use crate::ui::parking_strip::ParkingStrip;
 
 /// Everything the scene needs to draw one frame.

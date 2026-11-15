@@ -1,4 +1,5 @@
 use crate::BoardRectMm;
+use crate::Layout;
 use crate::SurfaceMm;
 use crate::TableEdge;
 use smearor_commons_geometry::Millimeters;

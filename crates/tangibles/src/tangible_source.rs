@@ -1,10 +1,10 @@
 use std::future::Future;
 use tangible_objects_model::DeviceInfo;
 use tangible_objects_model::FieldSet;
+use tangible_objects_model::TouchPoint;
 
 use crate::DaemonError;
 use crate::FieldEvent;
-use crate::TouchPoint;
 
 /// A source of tangible-object state, backed either by the daemon's
 /// GraphQL interface or a mock for tests/development.

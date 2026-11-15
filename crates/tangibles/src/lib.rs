@@ -20,6 +20,7 @@ mod field_name;
 mod field_set_builder;
 mod graphql_source;
 mod inference_output;
+mod layout;
 mod mock_source;
 mod move_inference;
 mod occupancy_probe;
@@ -28,7 +29,6 @@ mod placement_status;
 mod surface_mm;
 mod table_edge;
 mod tangible_source;
-mod touch_point;
 mod zone;
 mod zone_action;
 
@@ -43,6 +43,7 @@ pub use field_name::FieldName;
 pub use field_set_builder::FieldSetBuilder;
 pub use graphql_source::GraphQlSource;
 pub use inference_output::InferenceOutput;
+pub use layout::Layout;
 pub use mock_source::MockSource;
 pub use move_inference::MoveInference;
 pub use occupancy_probe::OccupancyProbe;
@@ -51,24 +52,8 @@ pub use placement_status::PlacementStatus;
 pub use surface_mm::SurfaceMm;
 pub use table_edge::TableEdge;
 pub use tangible_source::TangibleSource;
-pub use touch_point::ContactPos;
-pub use touch_point::TouchPoint;
 pub use zone::Zone;
 pub use zone_action::ZoneAction;
-
-/// The daemon's field-set domain type, re-exported so callers do not
-/// have to depend on `tangible-objects-model` directly.
-pub use tangible_objects_model::FieldSet;
-
-/// The contact-count domain type, re-exported so callers do not have
-/// to depend on `tangible-objects-model` directly.
-pub use tangible_objects_model::ContactCount;
-
-/// The dropped-event count domain type (lagged subscriptions).
-pub use tangible_objects_model::EventCount;
-
-/// The machine-readable rejection category of a registration.
-pub use tangible_objects_model::RejectionKind;
 
 /// Field set name registered with the daemon for chess.
 pub const FIELD_SET_NAME: &str = "chess";

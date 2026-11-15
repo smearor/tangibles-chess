@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use tangible_objects_model::DeviceInfo;
 use tangible_objects_model::FieldSet;
+use tangible_objects_model::TouchPoint;
 
 use crate::DaemonError;
 use crate::FIELD_SET_NAME;
@@ -9,7 +10,6 @@ use crate::FieldEvent;
 use crate::FieldEventKind;
 use crate::FieldName;
 use crate::TangibleSource;
-use crate::TouchPoint;
 
 /// Scriptable [`TangibleSource`] for tests and development without
 /// hardware: injects queued field events and answers queries with
