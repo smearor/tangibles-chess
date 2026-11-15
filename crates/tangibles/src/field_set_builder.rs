@@ -76,7 +76,7 @@ impl FieldSetBuilder {
         let board = self.board_mm.origin();
         let side = self
             .board_mm
-            .side
+            .side()
             .min(self.window_mm.width() - board.x_unit())
             .min(self.window_mm.height() - board.y_unit())
             .max(Millimeters::default());

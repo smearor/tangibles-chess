@@ -192,7 +192,11 @@ impl GameController {
         self.board_mm = self.resolve_board_mm(px_per_mm, panel, surface_mm);
         info!(
             "field set board_mm: ({:.1}, {:.1}, {:.1}) on {:.1}x{:.1}mm surface",
-            self.board_mm.x, self.board_mm.y, self.board_mm.side, surface_mm.x, surface_mm.y
+            self.board_mm.x(),
+            self.board_mm.y(),
+            self.board_mm.side(),
+            surface_mm.x,
+            surface_mm.y
         );
         FieldSetBuilder::new(self.board_mm, surface_mm).build()
     }
@@ -512,13 +516,13 @@ impl GameController {
             return;
         }
         for touch in touches {
-            let row = (touch.pos.y - board.y.as_f64()) / cell.as_f64();
+            let row = (touch.pos.y - board.y().as_f64()) / cell.as_f64();
             if !(0.0..8.0).contains(&row) {
                 continue;
             }
             let row = row as usize;
             let px = Millimeters::new(touch.pos.x);
-            if board.x >= cell && px >= board.x - cell && px < board.x {
+            if board.x() >= cell && px >= board.x() - cell && px < board.x() {
                 self.parked_west.set_occupied(row, true);
             }
             if board.x_max() + cell <= self.window_mm.width() && px >= board.x_max() && px < board.x_max() + cell {

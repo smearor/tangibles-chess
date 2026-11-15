@@ -10,6 +10,7 @@ use std::ops::Deref;
 /// Wraps [`Vec2<Millimeters>`] with the domain name (`x` is the width,
 /// `y` the height, following the [`smearor_commons_geometry::Size`]
 /// convention); `Deref` exposes the vector's methods directly.
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct SurfaceMm(pub Vec2<Millimeters>);
 
@@ -30,7 +31,7 @@ impl SurfaceMm {
 
     /// Whether `x` lies within the surface's horizontal bounds.
     pub fn contains_x(&self, x: Millimeters) -> bool {
-        x >= Millimeters::default() && x <= self.width()
+        (Millimeters::default()..=self.width()).contains(&x)
     }
 }
 

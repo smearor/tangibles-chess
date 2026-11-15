@@ -90,10 +90,11 @@ impl OccupancyProbe {
         self.counts.clear();
         let board = board_mm.into();
         let cell = board.cell().as_f64();
-        let (bx, by) = (board.x.as_f64(), board.y.as_f64());
+        let origin = board.origin();
         for touch in touches {
-            let col = ((touch.pos.x - bx) / cell) as i64;
-            let row = ((touch.pos.y - by) / cell) as i64;
+            let offset = touch.pos - origin;
+            let col = (offset.x / cell) as i64;
+            let row = (offset.y / cell) as i64;
             if (0..8).contains(&col)
                 && (0..8).contains(&row)
                 && let Some(index) = FieldIndex::new(row as usize * 8 + col as usize)

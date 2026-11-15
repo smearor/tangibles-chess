@@ -497,14 +497,13 @@ impl ChessScene {
     pub fn board_rect_mm(&self, scale: PixelsPerMm) -> Option<Rect<Millimeters>> {
         let board = self.board_rect()?;
         let root = self.root()?;
-        let mut min = Vec2::<Pixels>::splat(Pixels::new(f64::MAX));
-        let mut max = Vec2::<Pixels>::splat(Pixels::new(f64::MIN));
+        let mut corners = Vec::with_capacity(4);
         for corner in board.corners() {
-            let point = self.compute_point(&root, &graphene::Point::new(corner.x as f32, corner.y as f32))?;
-            min = Vec2::new(min.x.min(f64::from(point.x())), min.y.min(f64::from(point.y())));
-            max = Vec2::new(max.x.max(f64::from(point.x())), max.y.max(f64::from(point.y())));
+            let point = self.compute_point(&root, &corner.to_f32().into())?;
+            corners.push(Vec2::<Pixels>::new(f64::from(point.x()), f64::from(point.y())));
         }
-        Some(Rect::new(scale.unscale_vec(min), scale.unscale_vec(max - min)))
+        let rect = Rect::<Pixels>::from_points(corners)?;
+        Some(Rect::new(scale.unscale_vec(rect.min), scale.unscale_vec(rect.size)))
     }
 
     /// Maps a scene-space point to a square.
