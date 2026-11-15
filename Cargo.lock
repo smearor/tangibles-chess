@@ -696,7 +696,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1138,7 +1138,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 9.0.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2254,7 +2254,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2869,7 +2869,7 @@ checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 [[package]]
 name = "smearor-commons-color"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#77d2101ce911672db92ff0275e2d4949957f292b"
+source = "git+https://github.com/smearor/smearor-commons.git#1826164c1cdada9f3833d0e2d5c4ada73c87a1f2"
 dependencies = [
  "cairo-rs",
  "serde",
@@ -2879,7 +2879,7 @@ dependencies = [
 [[package]]
 name = "smearor-commons-geometry"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#77d2101ce911672db92ff0275e2d4949957f292b"
+source = "git+https://github.com/smearor/smearor-commons.git#1826164c1cdada9f3833d0e2d5c4ada73c87a1f2"
 dependencies = [
  "gtk4",
  "serde",
@@ -3048,7 +3048,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#65adbf34ecedc0854d7145b48a40c9cc5d66098a"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#6e6d27ed741cd187bf585d66fb0f7fc62c0c8a2e"
 dependencies = [
  "serde",
  "serde-jsonlines",
@@ -3061,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#65adbf34ecedc0854d7145b48a40c9cc5d66098a"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#6e6d27ed741cd187bf585d66fb0f7fc62c0c8a2e"
 dependencies = [
  "cynic",
  "futures",
@@ -3083,7 +3083,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#65adbf34ecedc0854d7145b48a40c9cc5d66098a"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#6e6d27ed741cd187bf585d66fb0f7fc62c0c8a2e"
 dependencies = [
  "cynic",
  "serde",
