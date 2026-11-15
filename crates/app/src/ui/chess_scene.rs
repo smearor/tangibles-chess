@@ -21,6 +21,7 @@ use smearor_commons_geometry::Rect;
 use smearor_commons_geometry::Vec2;
 use smearor_commons_geometry::WidgetSizeExt;
 use tangibles_chess_config::BoardTheme;
+use tangibles_chess_geometry::BOARD_GRID;
 use tangibles_chess_geometry::FieldIndex;
 use tangibles_chess_material::Piece;
 
@@ -509,15 +510,7 @@ impl ChessScene {
     /// Maps a scene-space point to a square.
     pub fn point_to_square(&self, point: Vec2<Pixels>) -> Option<Square> {
         let board = self.board_rect()?;
-        // Half-open bounds: `Rect::contains` is edge-inclusive, but a
-        // tap exactly on the far edge belongs to no square.
-        if !board.contains(&point) || point.x >= board.right() || point.y >= board.bottom() {
-            return None;
-        }
-        let cell = board.size.x_unit() / 8.0;
-        let col = ((point.x - board.min.x) / cell.as_f64()) as usize;
-        let row = ((point.y - board.min.y) / cell.as_f64()) as usize;
-        Some(scene_square(row * 8 + col))
+        Some(scene_square(BOARD_GRID.index_at(point, board)? as usize))
     }
 }
 
