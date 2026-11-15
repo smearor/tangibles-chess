@@ -2869,7 +2869,7 @@ checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 [[package]]
 name = "smearor-commons-color"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#1826164c1cdada9f3833d0e2d5c4ada73c87a1f2"
+source = "git+https://github.com/smearor/smearor-commons.git#4a364bae926c6ac21feb3f15571dc79be0124690"
 dependencies = [
  "cairo-rs",
  "serde",
@@ -2879,7 +2879,7 @@ dependencies = [
 [[package]]
 name = "smearor-commons-geometry"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#1826164c1cdada9f3833d0e2d5c4ada73c87a1f2"
+source = "git+https://github.com/smearor/smearor-commons.git#4a364bae926c6ac21feb3f15571dc79be0124690"
 dependencies = [
  "gtk4",
  "serde",
@@ -3048,7 +3048,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#6e6d27ed741cd187bf585d66fb0f7fc62c0c8a2e"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#cbd1c35dc2a892a6ccf1ff611350bad2f2e0666b"
 dependencies = [
  "serde",
  "serde-jsonlines",
@@ -3061,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#6e6d27ed741cd187bf585d66fb0f7fc62c0c8a2e"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#cbd1c35dc2a892a6ccf1ff611350bad2f2e0666b"
 dependencies = [
  "cynic",
  "futures",
@@ -3083,7 +3083,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#6e6d27ed741cd187bf585d66fb0f7fc62c0c8a2e"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#cbd1c35dc2a892a6ccf1ff611350bad2f2e0666b"
 dependencies = [
  "cynic",
  "serde",
