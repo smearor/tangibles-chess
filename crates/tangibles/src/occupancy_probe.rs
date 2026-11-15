@@ -122,6 +122,7 @@ impl OccupancyProbe {
 
 #[cfg(test)]
 mod tests {
+    use smearor_commons_geometry::Vec2;
     use tangibles_chess_geometry::FieldIndex;
 
     use super::OccupancyProbe;

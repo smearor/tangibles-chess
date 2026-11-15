@@ -4,14 +4,22 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gtk4::glib;
 use gtk4::graphene;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
+use gtk4::{GestureClick, glib};
 use shakmaty::Chess;
 use shakmaty::Position;
 use shakmaty::Square;
 use smearor_commons_color::Color;
+use smearor_commons_geometry::Fraction;
+use smearor_commons_geometry::Millimeters;
+use smearor_commons_geometry::Pixels;
+use smearor_commons_geometry::PixelsPerMm;
+use smearor_commons_geometry::Radians;
+use smearor_commons_geometry::Rect;
+use smearor_commons_geometry::Vec2;
+use smearor_commons_geometry::WidgetSizeExt;
 use tangibles_chess_config::BoardTheme;
 use tangibles_chess_geometry::FieldIndex;
 use tangibles_chess_material::Piece;
@@ -22,6 +30,17 @@ use crate::theme::ThemeSlot;
 use crate::ui::flash_role::FlashRole;
 use crate::ui::illegal_flash::IllegalFlash;
 use crate::ui::parking_strip::ParkingStrip;
+
+/// Fraction of the available extent the board fills - the rest stays
+/// free for frame and parking strips.
+pub(crate) const BOARD_FILL: Fraction = Fraction::new(0.88);
+
+/// Board-frame thickness as a fraction of the board edge - the wood
+/// border carrying the coordinate inlay.
+const FRAME_MARGIN: Fraction = Fraction::new(0.045);
+
+/// Coordinate-inlay font size as a fraction of the frame margin.
+const INLAY_FONT: Fraction = Fraction::new(0.55);
 
 /// Everything the scene needs to draw one frame.
 #[derive(Debug)]
@@ -51,7 +70,7 @@ pub(crate) struct SceneState {
     /// Live contact count per field (probe mirror, diagnostics).
     pub(crate) diag_counts: BTreeMap<FieldIndex, u32>,
     /// Raw touch positions in scene pixels (diagnostics).
-    pub(crate) diag_touches: Vec<(f64, f64)>,
+    pub(crate) diag_touches: Vec<Vec2<Pixels>>,
     /// Destination of a buffered move intent awaiting the confirm-zone
     /// press (`OnConfirmZone`).
     pub(crate) pending: Option<Square>,
@@ -108,29 +127,6 @@ type SquareHandler = Rc<dyn Fn(Square)>;
 /// touch points) - warm red, readable on any board material.
 const DIAGNOSTIC: Color<f64> = Color::<f64>::new(0.95, 0.3, 0.2);
 
-/// A rejected move's flash: the rejected target plus, when the naive
-/// move would have left the own king in check, the king and its
-/// attackers.
-#[derive(Debug)]
-pub(crate) struct IllegalFlash {
-    /// Flashed squares with their meaning.
-    pub squares: Vec<(Square, FlashRole)>,
-    /// Generation counter so a stale expiry timer cannot clear a newer
-    /// flash.
-    pub generation: u64,
-}
-
-/// What a flashed square explains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FlashRole {
-    /// The rejected destination.
-    Target,
-    /// The own king left in check.
-    King,
-    /// An attacker giving that check.
-    Attacker,
-}
-
 /// The drawable, tappable board.
 ///
 /// Renders the board in *scene space* (always `a8` top-left .. `h1`
@@ -138,8 +134,9 @@ pub(crate) enum FlashRole {
 /// All input arrives already un-rotated in scene coordinates.
 mod imp {
     use super::*;
-    use gtk4::IconLookupFlags;
+    use cairo::{Matrix, Operator, SurfacePattern};
     use gtk4::TextDirection;
+    use gtk4::{IconLookupFlags, IconPaintable, Orientation};
 
     /// Implementation state of [`ChessScene`].
     #[derive(Default)]
@@ -149,7 +146,7 @@ mod imp {
         /// Tap handler receiving scene-space squares.
         pub on_square: RefCell<Option<SquareHandler>>,
         /// Icon paintable cache (icon name → paintable).
-        pub paintables: RefCell<HashMap<String, gtk4::IconPaintable>>,
+        pub paintables: RefCell<HashMap<String, IconPaintable>>,
     }
 
     #[glib::object_subclass]
@@ -165,20 +162,16 @@ mod imp {
         /// (minimum, natural, min_baseline, nat_baseline): a small
         /// natural request - the tabletop must fit the window, never
         /// drive its size; vexpand distributes the surplus.
-        fn measure(&self, _orientation: gtk4::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
+        fn measure(&self, _orientation: Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
             (200, 400, -1, -1)
         }
 
         fn snapshot(&self, snapshot: &gtk4::Snapshot) {
-            let width = self.obj().width() as f64;
-            let height = self.obj().height() as f64;
-            if width <= 0.0 || height <= 0.0 {
-                return;
-            }
-            let Some((bx, by, bs)) = board_rect(width, height) else {
+            let extent = self.obj().allocated_size().to_f64().with_unit::<Pixels>();
+            let Some(board) = board_rect(extent) else {
                 return;
             };
-            let cell = bs / 8.0;
+            let cell = board.size.x_unit() / 8.0;
             let state = self.state.borrow();
             let palette = ThemePalette::of(state.theme);
             let light = palette.color(ThemeSlot::Light);
@@ -188,14 +181,11 @@ mod imp {
             // Board frame (the material border with coordinate inlay).
             // append_cairo clips to the given bounds but the context
             // itself draws in widget coordinates.
-            let frame = snapshot.append_cairo(&graphene::Rect::new(
-                (bx - bs * 0.045) as f32,
-                (by - bs * 0.045) as f32,
-                (bs * 1.09) as f32,
-                (bs * 1.09) as f32,
-            ));
+            let margin = board.size.x_unit() * FRAME_MARGIN;
+            let frame_rect = board.outset(margin);
+            let frame = snapshot.append_cairo(&frame_rect.to_f32().into());
             frame_color.apply(&frame);
-            frame.rectangle(bx - bs * 0.045, by - bs * 0.045, bs * 1.09, bs * 1.09);
+            frame.rectangle(frame_rect.min.x, frame_rect.min.y, frame_rect.size.x, frame_rect.size.y);
             let _ = frame.fill();
 
             // Coordinate inlay engraved into the frame: ranks run on
@@ -203,50 +193,49 @@ mod imp {
             // right rotated 180° for the north player); files on the
             // bottom edge upright and on the top edge rotated, so each
             // player reads the labels on their own side.
-            let muted = Color::<f64>::new(
-                (light.r + frame_color.r) / 2.0 + 0.08,
-                (light.g + frame_color.g) / 2.0 + 0.08,
-                (light.b + frame_color.b) / 2.0 + 0.08,
-            );
+            let muted = light.lerp(&frame_color, 0.5).brighten(0.08);
             muted.apply(&frame);
-            let margin = bs * 0.045;
-            let font = margin * 0.55;
-            frame.set_font_size(font);
+            let half_margin = margin / 2.0;
+            let font = margin * INLAY_FONT;
+            frame.set_font_size(font.as_f64());
             for row in 0..8usize {
                 let rank = (8 - row).to_string();
-                let cy = by + row as f64 * cell + cell / 2.0;
-                text_centered(&frame, &rank, bx - margin / 2.0, cy, 0.0);
-                text_centered(&frame, &rank, bx + bs + margin / 2.0, cy, std::f64::consts::PI);
+                let cy = board.min.y + (row as f64 + 0.5) * cell.as_f64();
+                text_centered(&frame, &rank, Vec2::<Pixels>::new(board.min.x - half_margin.as_f64(), cy), Radians::ZERO);
+                text_centered(&frame, &rank, Vec2::new(board.right() + half_margin.as_f64(), cy), Radians::HALF_TURN);
             }
             for col in 0..8usize {
                 let letter = ((b'a' + col as u8) as char).to_string();
-                let cx = bx + col as f64 * cell + cell / 2.0;
-                text_centered(&frame, &letter, cx, by + bs + margin / 2.0, 0.0);
-                text_centered(&frame, &letter, cx, by - margin / 2.0, std::f64::consts::PI);
+                let cx = board.min.x + (col as f64 + 0.5) * cell.as_f64();
+                text_centered(&frame, &letter, Vec2::new(cx, board.bottom() + half_margin.as_f64()), Radians::ZERO);
+                text_centered(&frame, &letter, Vec2::new(cx, board.min.y - half_margin.as_f64()), Radians::HALF_TURN);
             }
 
             // Captured-piece parking columns (physical modes): one cell
             // wide, board height, flush beside the board - matching the
             // `cap-*` daemon fields registered for the same geometry.
+            let column_size = Vec2::<Pixels>::from_px(cell, board.size.y_unit());
+            let west = Rect::new(board.min - Vec2::<Pixels>::from_px(cell, Pixels::new(0.0)), column_size);
+            let east = Rect::new(Vec2::new(board.right(), board.min.y), column_size);
             if state.parking_zones {
-                let parking = snapshot.append_cairo(&graphene::Rect::new((bx - cell) as f32, by as f32, (bs + 2.0 * cell) as f32, bs as f32));
-                if bx >= cell {
-                    parking_strip(&parking, bx - cell, by, cell, &state.cap_west, &palette);
+                let strip_area = Rect::new(west.min, Vec2::new(board.size.x + 2.0 * cell.as_f64(), board.size.y));
+                let parking = snapshot.append_cairo(&strip_area.to_f32().into());
+                if board.min.x >= cell.as_f64() {
+                    parking_strip(&parking, west, &state.cap_west, &palette);
                 }
-                if bx + bs + cell <= width {
-                    parking_strip(&parking, bx + bs, by, cell, &state.cap_east, &palette);
+                if board.right() + cell.as_f64() <= extent.x {
+                    parking_strip(&parking, east, &state.cap_east, &palette);
                 }
             }
 
-            let squares = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
+            let squares = snapshot.append_cairo(&board.to_f32().into());
             for scene in 0..64usize {
                 let (row, col) = (scene / 8, scene % 8);
                 let square = scene_square(scene);
+                let square_px = square_rect(board, scene);
                 let base = if (row + col) % 2 == 0 { light } else { dark };
-                let x = bx + col as f64 * cell;
-                let y = by + row as f64 * cell;
                 base.apply(&squares);
-                squares.rectangle(x, y, cell, cell);
+                squares.rectangle(square_px.min.x, square_px.min.y, square_px.size.x, square_px.size.y);
                 let _ = squares.fill();
 
                 // Per-square material (wood inlay): every square samples
@@ -257,77 +246,77 @@ mod imp {
                 {
                     let offset_x = pseudo_random(scene as u32, 3) * f64::from(surface.width());
                     let offset_y = pseudo_random(scene as u32, 11) * f64::from(surface.height());
-                    let pattern = gtk4::cairo::SurfacePattern::create(&surface);
+                    let pattern = SurfacePattern::create(&surface);
                     pattern.set_extend(gtk4::cairo::Extend::Repeat);
-                    let mut matrix = gtk4::cairo::Matrix::identity();
-                    matrix.translate(offset_x - x, offset_y - y);
+                    let mut matrix = Matrix::identity();
+                    matrix.translate(offset_x - square_px.min.x, offset_y - square_px.min.y);
                     pattern.set_matrix(matrix);
-                    squares.set_operator(gtk4::cairo::Operator::Multiply);
+                    squares.set_operator(Operator::Multiply);
                     let _ = squares.set_source(&pattern);
-                    squares.rectangle(x, y, cell, cell);
+                    squares.rectangle(square_px.min.x, square_px.min.y, square_px.size.x, square_px.size.y);
                     let _ = squares.fill();
-                    squares.set_operator(gtk4::cairo::Operator::Over);
+                    squares.set_operator(Operator::Over);
                 }
 
                 // Layered highlights.
                 if state.last_move.is_some_and(|(from, to)| from == square || to == square) {
-                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::LastMove), 0.28);
+                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::LastMove), 0.28);
                 }
                 if state.ceremony.contains(&square) {
-                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Ceremony), 0.35);
+                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::Ceremony), 0.35);
                 }
                 if state.missing.contains(&square) {
-                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check));
+                    ring_highlight(&squares, square_px, palette.color(ThemeSlot::Check));
                 }
                 if state.foreign.contains(&square) || state.discrepant.contains(&square) {
-                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Target));
+                    ring_highlight(&squares, square_px, palette.color(ThemeSlot::Target));
                 }
                 if state.selected == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection), 0.30);
+                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::Selection), 0.30);
                 }
                 if state.legal_targets.contains(&square) {
-                    target_dot(&squares, x, y, cell, palette.color(ThemeSlot::Target));
+                    target_dot(&squares, square_px, palette.color(ThemeSlot::Target));
                 }
                 if state.check == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check), 0.45);
+                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::Check), 0.45);
                 }
                 if let Some(flash) = &state.illegal {
                     for (flashed, role) in &flash.squares {
                         if *flashed == square {
                             match role {
-                                FlashRole::Target => fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check), 0.55),
+                                FlashRole::Target => fill_highlight(&squares, square_px, palette.color(ThemeSlot::Check), 0.55),
                                 FlashRole::King => {
-                                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check), 0.45);
-                                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check));
+                                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::Check), 0.45);
+                                    ring_highlight(&squares, square_px, palette.color(ThemeSlot::Check));
                                 }
-                                FlashRole::Attacker => ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Check)),
+                                FlashRole::Attacker => ring_highlight(&squares, square_px, palette.color(ThemeSlot::Check)),
                             }
                         }
                     }
                 }
                 if state.lifted == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection), 0.18);
+                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::Selection), 0.18);
                 }
                 if state.pending == Some(square) {
-                    fill_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection), 0.28);
-                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Selection));
+                    fill_highlight(&squares, square_px, palette.color(ThemeSlot::Selection), 0.28);
+                    ring_highlight(&squares, square_px, palette.color(ThemeSlot::Selection));
                 }
                 if state.ghost.is_some_and(|(_, to)| to == square) {
-                    ring_highlight(&squares, x, y, cell, palette.color(ThemeSlot::Ceremony));
+                    ring_highlight(&squares, square_px, palette.color(ThemeSlot::Ceremony));
                 }
 
                 // Diagnostics: field index (top-left) and live contact
                 // count (bottom-right), one per cell.
                 if state.diagnostics {
-                    let font = cell * 0.16;
+                    let font = cell.as_f64() * 0.16;
                     squares.set_font_size(font);
                     DIAGNOSTIC.apply_alpha(&squares, 0.8);
-                    squares.move_to(x + cell * 0.06, y + font * 1.2);
+                    squares.move_to(square_px.min.x + cell.as_f64() * 0.06, square_px.min.y + font * 1.2);
                     let _ = squares.show_text(&format!("f{scene}"));
                     if let Some(count) = FieldIndex::new(scene).and_then(|index| state.diag_counts.get(&index)) {
                         let label = count.to_string();
                         if let Ok(extents) = squares.text_extents(&label) {
-                            squares.move_to(x + cell - extents.width() - cell * 0.06, y + cell - font * 0.4);
+                            squares.move_to(square_px.right() - extents.width() - cell.as_f64() * 0.06, square_px.bottom() - font * 0.4);
                             let _ = squares.show_text(&label);
                         }
                     }
@@ -343,10 +332,10 @@ mod imp {
                 // Pattern space is surface pixels: scale it so one image
                 // spans `repeat` px on the board, anchored at the board
                 // corner - the repeat then tiles seamlessly.
-                let repeat = cell * 2.4;
+                let repeat = cell.as_f64() * 2.4;
                 let scale = f64::from(surface.width()) / repeat;
                 let mut matrix = gtk4::cairo::Matrix::identity();
-                matrix.translate(-bx, -by);
+                matrix.translate(-board.min.x, -board.min.y);
                 matrix.scale(scale, scale);
                 let pattern = gtk4::cairo::SurfacePattern::create(&surface);
                 pattern.set_matrix(matrix);
@@ -356,7 +345,7 @@ mod imp {
                 pattern.set_extend(gtk4::cairo::Extend::Repeat);
                 squares.set_operator(gtk4::cairo::Operator::Multiply);
                 let _ = squares.set_source(&pattern);
-                squares.rectangle(bx, by, bs, bs);
+                squares.rectangle(board.min.x, board.min.y, board.size.x, board.size.y);
                 let _ = squares.fill();
                 squares.set_operator(gtk4::cairo::Operator::Over);
             }
@@ -364,8 +353,8 @@ mod imp {
             // Diagnostics: raw touch points as dots on the board area.
             if state.diagnostics {
                 DIAGNOSTIC.apply_alpha(&squares, 0.5);
-                for &(tx, ty) in &state.diag_touches {
-                    squares.arc(tx, ty, cell * 0.2, 0.0, std::f64::consts::TAU);
+                for touch in &state.diag_touches {
+                    squares.arc(touch.x, touch.y, cell.as_f64() * 0.2, 0.0, std::f64::consts::TAU);
                     let _ = squares.fill();
                 }
             }
@@ -373,7 +362,7 @@ mod imp {
             // Piece layer.
             if state.render_pieces {
                 let scale = self.obj().scale_factor();
-                let paint_piece = |piece: Piece, x: f64, y: f64| {
+                let paint_piece = |piece: Piece, at: Vec2<Pixels>| {
                     let name = piece.icon_name();
                     let paintable = {
                         let mut cache = self.paintables.borrow_mut();
@@ -383,7 +372,7 @@ mod imp {
                                 gtk4::IconTheme::for_display(&self.obj().display()).lookup_icon(
                                     name,
                                     &[],
-                                    cell as i32,
+                                    cell.as_f64() as i32,
                                     scale,
                                     TextDirection::None,
                                     IconLookupFlags::empty(),
@@ -391,17 +380,18 @@ mod imp {
                             })
                             .clone()
                     };
+                    let half_cell = cell.as_f64() as f32 / 2.0;
                     snapshot.save();
-                    snapshot.translate(&graphene::Point::new(x as f32, y as f32));
+                    snapshot.translate(&at.to_f32().into());
                     if piece.side == tangibles_chess_material::Side::Black {
                         // The north player faces their own pieces: flip
                         // black glyphs around the cell centre so they are
                         // readable upside down.
-                        snapshot.translate(&graphene::Point::new((cell / 2.0) as f32, (cell / 2.0) as f32));
+                        snapshot.translate(&graphene::Point::new(half_cell, half_cell));
                         snapshot.rotate(180.0);
-                        snapshot.translate(&graphene::Point::new((-cell / 2.0) as f32, (-cell / 2.0) as f32));
+                        snapshot.translate(&graphene::Point::new(-half_cell, -half_cell));
                     }
-                    paintable.snapshot(snapshot, cell, cell);
+                    paintable.snapshot(snapshot, cell.as_f64(), cell.as_f64());
                     snapshot.restore();
                 };
                 if let Some(position) = &state.position {
@@ -412,20 +402,17 @@ mod imp {
                         if state.lifted == Some(square) {
                             continue; // in the player's hand
                         }
-                        let scene = square_scene(square);
-                        let x = bx + (scene % 8) as f64 * cell;
-                        let y = by + (scene / 8) as f64 * cell;
-                        paint_piece(Piece::from(piece), x, y);
+                        paint_piece(Piece::from(piece), square_rect(board, square_scene(square)).min);
                     }
                 }
                 // Parked captured pieces on the cap strips
                 // (`TangiblesRendered`): the cells sit beside the
                 // board, each the size of a board square.
                 if state.parking_zones {
-                    for (strip, strip_x) in [(state.cap_west, bx - cell), (state.cap_east, bx + bs)] {
+                    for (strip, column) in [(state.cap_west, west), (state.cap_east, east)] {
                         for (row, cell_state) in strip.cells().iter().enumerate() {
                             if let Some(piece) = cell_state.piece {
-                                paint_piece(piece, strip_x, by + row as f64 * cell);
+                                paint_piece(piece, column.min + Vec2::<Pixels>::from_px(Pixels::new(0.0), cell * row as f64));
                             }
                         }
                     }
@@ -444,10 +431,9 @@ mod imp {
                     .filter(|square| position.board().piece_at(*square).is_some())
                     .collect();
                 if !captures.is_empty() {
-                    let ring = snapshot.append_cairo(&graphene::Rect::new(bx as f32, by as f32, bs as f32, bs as f32));
+                    let ring = snapshot.append_cairo(&board.to_f32().into());
                     for square in captures {
-                        let scene = square_scene(square);
-                        ring_highlight(&ring, bx + (scene % 8) as f64 * cell, by + (scene / 8) as f64 * cell, cell, palette.color(ThemeSlot::Target));
+                        ring_highlight(&ring, square_rect(board, square_scene(square)), palette.color(ThemeSlot::Target));
                     }
                 }
             }
@@ -469,12 +455,12 @@ impl ChessScene {
         let scene: Self = glib::Object::builder().build();
         scene.set_hexpand(true);
         scene.set_vexpand(true);
-        let click = gtk4::GestureClick::new();
+        let click = GestureClick::new();
         click.connect_released(glib::clone!(
             #[weak]
             scene,
             move |_, _n, x, y| {
-                if let Some(square) = scene.point_to_square(x, y)
+                if let Some(square) = scene.point_to_square(Vec2::<Pixels>::new(x, y))
                     && let Some(handler) = scene.imp().on_square.borrow().as_ref()
                 {
                     handler(square);
@@ -497,8 +483,8 @@ impl ChessScene {
     }
 
     /// The board rectangle in scene-local pixels.
-    pub fn board_rect(&self) -> Option<(f64, f64, f64)> {
-        board_rect(self.width() as f64, self.height() as f64)
+    pub fn board_rect(&self) -> Option<Rect<Pixels>> {
+        board_rect(Vec2::<Pixels>::new(self.width() as f64, self.height() as f64))
     }
 
     /// The board rectangle converted to screen millimeters.
@@ -508,43 +494,38 @@ impl ChessScene {
     /// stays correct while the surface sits rotated inside the
     /// `RotationWidget`, where a naive `(0,0)` lookup would report the
     /// corner's transformed position instead of the board's coverage.
-    pub fn board_rect_mm(&self, mm_per_px: f64) -> Option<(f64, f64, f64)> {
-        let (bx, by, bs) = self.board_rect()?;
+    pub fn board_rect_mm(&self, scale: PixelsPerMm) -> Option<Rect<Millimeters>> {
+        let board = self.board_rect()?;
         let root = self.root()?;
-        let mut min_x = f64::MAX;
-        let mut min_y = f64::MAX;
-        let mut max_x = f64::MIN;
-        let mut max_y = f64::MIN;
-        for (px, py) in [(bx, by), (bx + bs, by), (bx, by + bs), (bx + bs, by + bs)] {
-            let point = self.compute_point(&root, &graphene::Point::new(px as f32, py as f32))?;
-            min_x = min_x.min(point.x() as f64);
-            min_y = min_y.min(point.y() as f64);
-            max_x = max_x.max(point.x() as f64);
-            max_y = max_y.max(point.y() as f64);
+        let mut min = Vec2::<Pixels>::splat(Pixels::new(f64::MAX));
+        let mut max = Vec2::<Pixels>::splat(Pixels::new(f64::MIN));
+        for corner in board.corners() {
+            let point = self.compute_point(&root, &graphene::Point::new(corner.x as f32, corner.y as f32))?;
+            min = Vec2::new(min.x.min(f64::from(point.x())), min.y.min(f64::from(point.y())));
+            max = Vec2::new(max.x.max(f64::from(point.x())), max.y.max(f64::from(point.y())));
         }
-        let side = ((max_x - min_x).min(max_y - min_y)) * mm_per_px;
-        Some((min_x * mm_per_px, min_y * mm_per_px, side))
+        Some(Rect::new(scale.unscale_vec(min), scale.unscale_vec(max - min)))
     }
 
     /// Maps a scene-space point to a square.
-    pub fn point_to_square(&self, x: f64, y: f64) -> Option<Square> {
-        let (bx, by, bs) = board_rect(self.width() as f64, self.height() as f64)?;
-        if x < bx || y < by || x >= bx + bs || y >= by + bs {
+    pub fn point_to_square(&self, point: Vec2<Pixels>) -> Option<Square> {
+        let board = self.board_rect()?;
+        // Half-open bounds: `Rect::contains` is edge-inclusive, but a
+        // tap exactly on the far edge belongs to no square.
+        if !board.contains(&point) || point.x >= board.right() || point.y >= board.bottom() {
             return None;
         }
-        let col = ((x - bx) / (bs / 8.0)) as usize;
-        let row = ((y - by) / (bs / 8.0)) as usize;
+        let cell = board.size.x_unit() / 8.0;
+        let col = ((point.x - board.min.x) / cell.as_f64()) as usize;
+        let row = ((point.y - board.min.y) / cell.as_f64()) as usize;
         Some(scene_square(row * 8 + col))
     }
 }
 
-/// Centered board rect inside the widget.
-fn board_rect(width: f64, height: f64) -> Option<(f64, f64, f64)> {
-    let side = width.min(height) * 0.88;
-    if side <= 0.0 {
-        return None;
-    }
-    Some(((width - side) / 2.0, (height - side) / 2.0, side))
+/// Centered board rect inside `size` (scene-local pixels).
+fn board_rect(size: Vec2<Pixels>) -> Option<Rect<Pixels>> {
+    let side = Pixels::new(size.x.min(size.y)) * BOARD_FILL;
+    (side.as_f64() > 0.0).then(|| Rect::centered(size.half(), Vec2::splat(side)))
 }
 
 /// Scene-space index (0 = top-left = a8) → square.
@@ -563,19 +544,20 @@ fn square_scene(square: Square) -> usize {
 /// reads as a place to park pieces rather than as board squares.
 /// Occupied cells are highlighted so a parked marker is visible at a
 /// glance.
-fn parking_strip(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, strip: &ParkingStrip, palette: &ThemePalette) {
+fn parking_strip(cr: &gtk4::cairo::Context, column: Rect<Pixels>, strip: &ParkingStrip, palette: &ThemePalette) {
+    let cell = column.size.x_unit();
     for (index, cell_state) in strip.cells().iter().enumerate() {
-        let yy = y + index as f64 * cell;
+        let cell_rect = Rect::new(column.min + Vec2::<Pixels>::from_px(Pixels::new(0.0), cell * index as f64), Vec2::splat(cell));
         if cell_state.occupied {
             palette.color(ThemeSlot::Target).apply_alpha(cr, 0.45);
         } else {
             palette.color(ThemeSlot::Dark).apply_alpha(cr, 0.30);
         }
-        cr.rectangle(x, yy, cell, cell);
+        cr.rectangle(cell_rect.min.x, cell_rect.min.y, cell_rect.size.x, cell_rect.size.y);
         let _ = cr.fill();
         palette.color(ThemeSlot::Frame).apply_alpha(cr, 0.7);
         cr.set_line_width(1.0);
-        cr.rectangle(x + 0.5, yy + 0.5, cell - 1.0, cell - 1.0);
+        cr.rectangle(cell_rect.min.x + 0.5, cell_rect.min.y + 0.5, cell.as_f64() - 1.0, cell.as_f64() - 1.0);
         let _ = cr.stroke();
     }
 }
@@ -645,39 +627,47 @@ fn decode_texture(bytes: &'static [u8]) -> Option<gtk4::cairo::ImageSurface> {
     Some(surface)
 }
 
+/// The scene-local pixel rect of board square `scene` (0 = a8,
+/// row-major).
+fn square_rect(board: Rect<Pixels>, scene: usize) -> Rect<Pixels> {
+    let cell = board.size.x_unit() / 8.0;
+    Rect::new(board.min + Vec2::<Pixels>::from_px(cell * (scene % 8) as f64, cell * (scene / 8) as f64), Vec2::splat(cell))
+}
+
 /// Soft filled highlight over one cell.
-fn fill_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: Color<f64>, alpha: f64) {
+fn fill_highlight(cr: &gtk4::cairo::Context, square: Rect<Pixels>, color: Color<f64>, alpha: f64) {
     color.apply_alpha(cr, alpha);
-    cr.rectangle(x, y, cell, cell);
+    cr.rectangle(square.min.x, square.min.y, square.size.x, square.size.y);
     let _ = cr.fill();
 }
 
 /// Ring outline inside a cell (missing/foreign/ghost).
-fn ring_highlight(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: Color<f64>) {
+fn ring_highlight(cr: &gtk4::cairo::Context, square: Rect<Pixels>, color: Color<f64>) {
     color.apply_alpha(cr, 0.85);
-    cr.set_line_width((cell * 0.06).max(2.0));
-    let inset = cell * 0.08;
-    cr.rectangle(x + inset, y + inset, cell - inset * 2.0, cell - inset * 2.0);
+    let cell = square.size.x_unit();
+    cr.set_line_width((cell * 0.06).as_f64().max(2.0));
+    let ring = square.inset(cell * 0.08);
+    cr.rectangle(ring.min.x, ring.min.y, ring.size.x, ring.size.y);
     let _ = cr.stroke();
 }
 
 /// Legal-target dot.
-fn target_dot(cr: &gtk4::cairo::Context, x: f64, y: f64, cell: f64, color: Color<f64>) {
+fn target_dot(cr: &gtk4::cairo::Context, square: Rect<Pixels>, color: Color<f64>) {
     color.apply_alpha(cr, 0.55);
-    let center = cell / 2.0;
-    cr.arc(x + center, y + center, cell * 0.16, 0.0, std::f64::consts::TAU);
+    let center = square.center();
+    cr.arc(center.x, center.y, (square.size.x_unit() * 0.16).as_f64(), 0.0, std::f64::consts::TAU);
     let _ = cr.fill();
 }
 
-/// Draws `text` centered on `(x, y)`, rotated by `angle` radians.
+/// Draws `text` centered on `at`, rotated by `angle`.
 ///
 /// Used for the frame inlay so the north-edge labels are readable by
 /// the player sitting opposite.
-fn text_centered(cr: &gtk4::cairo::Context, text: &str, x: f64, y: f64, angle: f64) {
+fn text_centered(cr: &gtk4::cairo::Context, text: &str, at: Vec2<Pixels>, angle: Radians) {
     if let Ok(extents) = cr.text_extents(text) {
         let _ = cr.save();
-        cr.translate(x, y);
-        cr.rotate(angle);
+        cr.translate(at.x, at.y);
+        cr.rotate(angle.as_f64());
         cr.move_to(-(extents.x_bearing() + extents.width() / 2.0), -(extents.y_bearing() + extents.height() / 2.0));
         let _ = cr.show_text(text);
         let _ = cr.restore();

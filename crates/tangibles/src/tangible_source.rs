@@ -1,3 +1,4 @@
+use async_channel::Receiver;
 use std::future::Future;
 use tangible_objects_model::DeviceInfo;
 use tangible_objects_model::FieldSet;
@@ -14,7 +15,7 @@ pub trait TangibleSource: Send + Sync {
     /// Called once at activation; the receiver stays valid until the
     /// source is dropped. Implementations must translate broadcast lag
     /// into `FieldEventKind::Lagged` events so callers resync.
-    fn events(&self) -> async_channel::Receiver<FieldEvent>;
+    fn events(&self) -> Receiver<FieldEvent>;
 
     /// Device calibration from the `deviceInfo` query.
     fn device_info(&self) -> impl Future<Output = Result<DeviceInfo, DaemonError>> + Send;

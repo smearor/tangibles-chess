@@ -1,3 +1,6 @@
+use async_channel::Receiver;
+use async_channel::Sender;
+use async_channel::unbounded;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tangible_objects_model::DeviceInfo;
@@ -17,9 +20,9 @@ use crate::TangibleSource;
 #[derive(Clone)]
 pub struct MockSource {
     /// Event stream handed to `events()`.
-    events: async_channel::Sender<FieldEvent>,
+    events: Sender<FieldEvent>,
     /// The matching receiver.
-    receiver: async_channel::Receiver<FieldEvent>,
+    receiver: Receiver<FieldEvent>,
     /// Device calibration returned by `device_info`.
     device: DeviceInfo,
     /// Field set registrations observed, for test assertions.
@@ -28,7 +31,7 @@ pub struct MockSource {
 
 impl Default for MockSource {
     fn default() -> Self {
-        let (events, receiver) = async_channel::unbounded();
+        let (events, receiver) = unbounded();
         Self {
             events,
             receiver,
@@ -74,7 +77,7 @@ impl MockSource {
 }
 
 impl TangibleSource for MockSource {
-    fn events(&self) -> async_channel::Receiver<FieldEvent> {
+    fn events(&self) -> Receiver<FieldEvent> {
         self.receiver.clone()
     }
 

@@ -5,6 +5,9 @@
 use gtk4::cairo::Context;
 use gtk4::prelude::*;
 use smearor_commons_color::Color;
+use smearor_commons_geometry::Radians;
+use smearor_commons_geometry::RotationRad;
+use smearor_commons_geometry::Vec2;
 use tangibles_chess_config::BoardTheme;
 use tangibles_chess_config::CommitMode;
 use tangibles_chess_config::OpponentKind;
@@ -231,8 +234,8 @@ pub fn clock_preview(control: Option<TimeControl>) -> gtk4::DrawingArea {
                 // angle scales with the base budget so presets read
                 // differently at a glance.
                 let fraction = (f64::from(control.initial_seconds) / 1800.0).min(1.0);
-                let angle = -std::f64::consts::FRAC_PI_2 + fraction * std::f64::consts::PI * 1.5;
-                clock_hand(cr, center_x, center_y, radius * 0.78, -std::f64::consts::FRAC_PI_2);
+                let angle = Radians::new(-std::f64::consts::FRAC_PI_2 + fraction * std::f64::consts::PI * 1.5);
+                clock_hand(cr, center_x, center_y, radius * 0.78, -Radians::QUARTER_TURN);
                 clock_hand(cr, center_x, center_y, radius * 0.52, angle);
                 disc(cr, center_x, center_y, radius * 0.10, NEUTRAL_DARK);
                 if control.increment_seconds > 0 {
@@ -243,14 +246,15 @@ pub fn clock_preview(control: Option<TimeControl>) -> gtk4::DrawingArea {
     })
 }
 
-/// A clock hand from the face center at `angle` (radians, 0 = 3
-/// o'clock) with length `length`.
-fn clock_hand(cr: &Context, x: f64, y: f64, length: f64, angle: f64) {
+/// A clock hand from the face center at `angle` (0 = 3 o'clock)
+/// with length `length`.
+fn clock_hand(cr: &Context, x: f64, y: f64, length: f64, angle: Radians) {
     NEUTRAL_DARK.apply(cr);
     cr.set_line_width(length * 0.14);
     cr.set_line_cap(gtk4::cairo::LineCap::Round);
+    let tip = Vec2::<()>::new(x, y) + Vec2::<()>::from_polar(length, RotationRad::from(angle));
     cr.move_to(x, y);
-    cr.line_to(x + length * angle.cos(), y + length * angle.sin());
+    cr.line_to(tip.x, tip.y);
     let _ = cr.stroke();
 }
 
@@ -324,16 +328,23 @@ fn check_mark(cr: &Context, x: f64, y: f64, size: f64) {
 
 /// A straight arrow from `(x1, y1)` to `(x2, y2)` with a filled head.
 fn arrow(cr: &Context, x1: f64, y1: f64, x2: f64, y2: f64) {
-    let angle = (y2 - y1).atan2(x2 - x1);
-    let head = (x2 - x1).hypot(y2 - y1).clamp(6.0, 12.0);
+    let from = Vec2::<()>::new(x1, y1);
+    let tip = Vec2::<()>::new(x2, y2);
+    let shaft = tip - from;
+    let angle = shaft.direction();
+    let head = shaft.magnitude_f64().clamp(6.0, 12.0);
     ACCENT.apply(cr);
     cr.set_line_width(2.0);
+    let base = tip - Vec2::<()>::from_polar(head, angle);
     cr.move_to(x1, y1);
-    cr.line_to(x2 - head * angle.cos(), y2 - head * angle.sin());
+    cr.line_to(base.x, base.y);
     let _ = cr.stroke();
-    cr.move_to(x2, y2);
-    cr.line_to(x2 - head * (angle - 0.5).cos(), y2 - head * (angle - 0.5).sin());
-    cr.line_to(x2 - head * (angle + 0.5).cos(), y2 - head * (angle + 0.5).sin());
+    let half_span = RotationRad::from(0.5);
+    let wing_a = tip - Vec2::<()>::from_polar(head, angle - half_span);
+    let wing_b = tip - Vec2::<()>::from_polar(head, angle + half_span);
+    cr.move_to(tip.x, tip.y);
+    cr.line_to(wing_a.x, wing_a.y);
+    cr.line_to(wing_b.x, wing_b.y);
     let _ = cr.fill();
 }
 

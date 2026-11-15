@@ -4,6 +4,7 @@ use tangible_objects_model::TouchPoint;
 use tangibles_chess_tangibles::DaemonError;
 use tangibles_chess_tangibles::GraphQlSource;
 use tangibles_chess_tangibles::TangibleSource;
+use tokio::runtime::Runtime;
 
 /// Owns the Tokio runtime the daemon client runs on.
 ///
@@ -13,7 +14,7 @@ use tangibles_chess_tangibles::TangibleSource;
 /// staying parked).
 pub struct TangibleHost {
     /// The Tokio runtime driving daemon I/O.
-    runtime: tokio::runtime::Runtime,
+    runtime: Runtime,
 }
 
 impl TangibleHost {

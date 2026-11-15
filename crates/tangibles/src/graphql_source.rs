@@ -1,3 +1,5 @@
+use async_channel::Receiver;
+use async_channel::bounded;
 use futures_lite::StreamExt;
 use tangible_objects_client::ClientError;
 use tangible_objects_client::Endpoint;
@@ -9,6 +11,8 @@ use tangible_objects_model::Lifetime;
 use tangible_objects_model::Owner;
 use tangible_objects_model::RegisterFieldSetResult;
 use tangible_objects_model::TouchPoint;
+use tokio::spawn;
+use tokio::task::JoinHandle;
 use tracing::debug;
 use tracing::warn;
 
@@ -30,9 +34,9 @@ pub struct GraphQlSource {
     /// The upstream typed client.
     client: GraphQLClient,
     /// Live field-event stream (our projection).
-    receiver: async_channel::Receiver<FieldEvent>,
+    receiver: Receiver<FieldEvent>,
     /// The subscription pump task; kept alive by holding the handle.
-    _task: tokio::task::JoinHandle<()>,
+    _task: JoinHandle<()>,
 }
 
 impl GraphQlSource {
@@ -48,8 +52,8 @@ impl GraphQlSource {
         let client = GraphQLClient::new(endpoint)?;
         let set = FieldSetName::new(crate::FIELD_SET_NAME);
         let mut stream = Box::pin(client.field_events(Some(&set)).await?);
-        let (tx, receiver) = async_channel::bounded(256);
-        let task = tokio::spawn(async move {
+        let (tx, receiver) = bounded(256);
+        let task = spawn(async move {
             while let Some(item) = stream.next().await {
                 match item {
                     Ok(event) => {
@@ -70,7 +74,7 @@ impl GraphQlSource {
 }
 
 impl TangibleSource for GraphQlSource {
-    fn events(&self) -> async_channel::Receiver<FieldEvent> {
+    fn events(&self) -> Receiver<FieldEvent> {
         self.receiver.clone()
     }
 

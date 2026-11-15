@@ -10,6 +10,12 @@ use gtk4::prelude::WidgetExt;
 use shakmaty::Position;
 use shakmaty::Square;
 use smearor_commons_geometry::Millimeters;
+use smearor_commons_geometry::Pixels;
+use smearor_commons_geometry::PixelsPerMm;
+use smearor_commons_geometry::Rect;
+use smearor_commons_geometry::Rectangle;
+use smearor_commons_geometry::Vec2;
+use smearor_commons_geometry::WidgetSizeExt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
@@ -42,6 +48,7 @@ use super::source::Source;
 use crate::placement_issue::PlacementIssue;
 use crate::playable::Playable;
 use crate::tangible_host::TangibleHost;
+use crate::ui::chess_scene::BOARD_FILL;
 
 impl GameController {
     /// Connects to the daemon, registers the chess field set and starts
@@ -156,7 +163,7 @@ impl GameController {
 
     /// Computes the board rect in screen millimeters and builds the
     /// field set registration.
-    fn build_field_set(&mut self, source: &GraphQlSource) -> tangibles_chess_tangibles::FieldSet {
+    fn build_field_set(&mut self, source: &GraphQlSource) -> FieldSet {
         // Window size in screen mm comes from the device calibration;
         // the board rect in mm is the rendered board rect scaled by
         // mm-per-pixel of the panel. The px denominator is the monitor
@@ -166,42 +173,61 @@ impl GameController {
             return FieldSetBuilder::new((0.0, 0.0, 100.0), (100.0, 100.0)).build();
         };
         let info = host.device_info(source).unwrap_or_default();
-        let (screen_w_mm, screen_h_mm) = info.screen_mm().unwrap_or((1000.0, 600.0));
-        let (panel_w, panel_h) = self
-            .panel_px()
-            .unwrap_or_else(|| (self.screen.widget.width().max(1) as f64, self.screen.widget.height().max(1) as f64));
-        let mm_per_px_x = screen_w_mm / panel_w;
-        let mm_per_px_y = screen_h_mm / panel_h;
-        let mm_per_px = (mm_per_px_x + mm_per_px_y) / 2.0;
-        let widget_size = (self.screen.widget.width(), self.screen.widget.height());
+        let surface_mm = info.surface_mm().map(SurfaceMm::from).unwrap_or(SurfaceMm::FALLBACK);
+        let panel = self.panel_size_px();
+        // mm per screen pixel on each axis - the app runs fullscreen,
+        // so x and y should agree; the mean absorbs calibration jitter.
+        let mm_per_px_axes = surface_mm.with_unit::<()>() / panel.with_unit::<()>();
+        let px_per_mm = PixelsPerMm::new(mm_per_px_axes.component_mean().recip());
+        let widget_size = self.screen.widget.allocated_size();
         let scene_rect = self.screen.surface.scene.board_rect();
         info!(
-            "field set build: panel={panel_w:.0}x{panel_h:.0}px -> {:.3}mm/px (x={mm_per_px_x:.3} y={mm_per_px_y:.3}), \
-             widget={}x{}, scene_board={scene_rect:?}",
-            widget_size.0, widget_size.1, mm_per_px
+            "field set build: panel={panel} -> {:.3}mm/px (x={:.3} y={:.3}), \
+             widget={widget_size}, scene_board={scene_rect:?}",
+            mm_per_px_axes.component_mean(),
+            mm_per_px_axes.x,
+            mm_per_px_axes.y
         );
-        self.window_mm = SurfaceMm::from((screen_w_mm, screen_h_mm));
-        if let Some((bx, by, bs)) = self.screen.surface.scene.board_rect_mm(mm_per_px) {
-            self.board_mm = BoardRectMm::from((bx, by, bs));
-        } else {
-            // Scene not realized yet: approximate with a centered square.
-            let side = panel_w.min(panel_h) * 0.88 * mm_per_px;
-            self.board_mm = BoardRectMm::from(((screen_w_mm - side) / 2.0, (screen_h_mm - side) / 2.0, side));
-        }
+        self.window_mm = surface_mm;
+        self.board_mm = self.resolve_board_mm(px_per_mm, panel, surface_mm);
         info!(
             "field set board_mm: ({:.1}, {:.1}, {:.1}) on {:.1}x{:.1}mm surface",
-            self.board_mm.x, self.board_mm.y, self.board_mm.side, screen_w_mm, screen_h_mm
+            self.board_mm.x, self.board_mm.y, self.board_mm.side, surface_mm.x, surface_mm.y
         );
-        FieldSetBuilder::new(self.board_mm, (screen_w_mm, screen_h_mm)).build()
+        FieldSetBuilder::new(self.board_mm, surface_mm).build()
     }
 
-    /// The monitor's pixel size that hosts our surface - the panel the
-    /// touch coordinates are calibrated against.
-    fn panel_px(&self) -> Option<(f64, f64)> {
+    /// The monitor's geometry that hosts our surface - the panel the
+    /// touch coordinates are calibrated against. Only its `size` is
+    /// consumed; the `x`/`y` position is the multi-monitor layout
+    /// offset.
+    fn panel_px(&self) -> Option<Rectangle<i32>> {
         let surface = self.screen.widget.native()?.surface()?;
         let monitor = surface.display().monitor_at_surface(&surface)?;
-        let geom = monitor.geometry();
-        Some((geom.width() as f64, geom.height() as f64))
+        Some(monitor.geometry().into())
+    }
+
+    /// The pixel extent the touch coordinates are calibrated against:
+    /// the host monitor's size, falling back to the widget allocation
+    /// while the surface has no monitor yet.
+    fn panel_size_px(&self) -> Vec2<Pixels> {
+        self.panel_px()
+            .map(|panel| panel.size)
+            .unwrap_or_else(|| self.screen.widget.allocated_size().map(|side| side.max(1)))
+            .to_f64()
+            .with_unit::<Pixels>()
+    }
+
+    /// The board rectangle in screen millimeters: the scene's rendered
+    /// board rect scaled by `px_per_mm` - or, while the scene is
+    /// unrealized, a centered square at `BOARD_FILL` of the panel's
+    /// short edge.
+    fn resolve_board_mm(&self, px_per_mm: PixelsPerMm, panel: Vec2<Pixels>, surface_mm: SurfaceMm) -> BoardRectMm {
+        if let Some(board_mm) = self.screen.surface.scene.board_rect_mm(px_per_mm) {
+            return BoardRectMm::from(board_mm);
+        }
+        let side = px_per_mm.unscale(Pixels::new(panel.x.min(panel.y)) * BOARD_FILL);
+        BoardRectMm::from(Rect::<Millimeters>::centered(surface_mm.half(), Vec2::splat(side)))
     }
 
     /// One field event from the daemon.
@@ -403,24 +429,17 @@ impl GameController {
     }
 
     /// Touch positions in scene pixels (board-rect anchored, mm→px).
-    fn touches_px(&self, touches: &[TouchPoint]) -> Vec<(f64, f64)> {
-        let Some((bx, by, bs)) = self.screen.surface.scene.board_rect() else {
+    fn touches_px(&self, touches: &[TouchPoint]) -> Vec<Vec2<Pixels>> {
+        let Some(board) = self.screen.surface.scene.board_rect() else {
             return Vec::new();
         };
         let cell_mm = self.board_mm.cell().as_f64();
-        if cell_mm <= 0.0 || bs <= 0.0 {
+        if cell_mm <= 0.0 || board.size.x <= 0.0 {
             return Vec::new();
         }
-        let mm_per_px = cell_mm / (bs / 8.0);
-        touches
-            .iter()
-            .map(|point| {
-                (
-                    bx + (point.pos.x - self.board_mm.x.as_f64()) / mm_per_px,
-                    by + (point.pos.y - self.board_mm.y.as_f64()) / mm_per_px,
-                )
-            })
-            .collect()
+        let px_per_mm = PixelsPerMm::new((board.size.x / 8.0) / cell_mm);
+        let origin = self.board_mm.origin();
+        touches.iter().map(|point| board.min + px_per_mm.scale_vec(point.pos - origin)).collect()
     }
 
     /// Queries live touch points from the active source (`None` on no
@@ -502,7 +521,7 @@ impl GameController {
             if board.x >= cell && px >= board.x - cell && px < board.x {
                 self.parked_west.set_occupied(row, true);
             }
-            if board.x_max() + cell <= self.window_mm.width && px >= board.x_max() && px < board.x_max() + cell {
+            if board.x_max() + cell <= self.window_mm.width() && px >= board.x_max() && px < board.x_max() + cell {
                 self.parked_east.set_occupied(row, true);
             }
         }

@@ -5,13 +5,12 @@ use crate::TableEdge;
 use smearor_commons_geometry::Millimeters;
 use smearor_commons_geometry::Rect;
 use smearor_commons_geometry::Vec2;
-use tangibles_chess_geometry::BOARD_GRID;
 use tangible_objects_model::Field;
 use tangible_objects_model::FieldName;
 use tangible_objects_model::FieldSet;
 use tangible_objects_model::FieldSetName;
 use tangible_objects_model::FrameCount;
-use tangible_objects_model::Region;
+use tangibles_chess_geometry::BOARD_GRID;
 
 /// Builds the chess [`FieldSet`] from board geometry in screen
 /// millimeters.
@@ -37,10 +36,10 @@ impl FieldSetBuilder {
     }
 
     /// One occupancy cell named `name` with absolute bounds.
-    fn field(name: impl std::fmt::Display, x_min: Millimeters, y_min: Millimeters, x_max: Millimeters, y_max: Millimeters) -> Field {
+    fn field(name: impl std::fmt::Display, rect: Rect<Millimeters>) -> Field {
         Field {
             name: FieldName::new(name.to_string()),
-            region: Region { x_min, y_min, x_max, y_max },
+            region: rect.into(),
         }
     }
 
@@ -74,31 +73,32 @@ impl FieldSetBuilder {
     /// (half a square fits a resting figure - ~40mm on an 80mm cell -
     /// without eating the whole tray strip).
     fn layout(&self) -> Layout {
-        let (bx, by) = (self.board_mm.x, self.board_mm.y);
-        let (ww, wh) = (self.window_mm.width, self.window_mm.height);
-        let bs = self.board_mm.side.min(ww - bx).min(wh - by).max(Millimeters::default());
-        let cell = bs * 0.125;
+        let board = self.board_mm.origin();
+        let side = self
+            .board_mm
+            .side
+            .min(self.window_mm.width() - board.x_unit())
+            .min(self.window_mm.height() - board.y_unit())
+            .max(Millimeters::default());
+        let cell = side * 0.125;
         Layout {
-            bx,
-            by,
-            bs,
+            board,
+            side,
             cell,
             gap: Millimeters::new(4.0),
             zone: cell * 0.5,
-            ww,
-            wh,
+            surface: self.window_mm,
         }
     }
 
     /// The 64 board cells `f0`..`f63`, row-major from the board's
     /// top-left corner.
     fn board_fields(&self, layout: &Layout) -> Vec<Field> {
-        let frame = Rect::<Millimeters, f64>::new(Vec2::new(layout.bx.as_f64(), layout.by.as_f64()), Vec2::new(layout.bs.as_f64(), layout.bs.as_f64()));
+        let frame = Rect::new(layout.board, Vec2::splat(layout.side));
         (0..64)
             .filter_map(|index| {
                 let cell = BOARD_GRID.cell(index)?;
-                let rect = BOARD_GRID.rect_within(cell, frame);
-                Some(Self::field(format!("f{index}"), rect.min.x.into(), rect.min.y.into(), rect.right().into(), rect.bottom().into()))
+                Some(Self::field(format!("f{index}"), BOARD_GRID.rect_within(cell, frame)))
             })
             .collect()
     }
@@ -111,19 +111,19 @@ impl FieldSetBuilder {
     fn edge_fields(&self, edge: TableEdge, layout: &Layout) -> Vec<Field> {
         let (btn, tray, y0, y1, ty0, ty1) = match edge {
             TableEdge::South => {
-                let top = layout.by + layout.bs + layout.gap;
-                let confirm_h = (layout.wh - top).max(Millimeters::default()).min(layout.zone);
+                let top = layout.board.y_unit() + layout.side + layout.gap;
+                let confirm_h = (layout.surface.height() - top).max(Millimeters::default()).min(layout.zone);
                 (
                     crate::Zone::BtnSouth,
                     crate::Zone::TraySouth,
                     top,
                     top + confirm_h,
-                    (top + confirm_h).min(layout.wh),
-                    layout.wh,
+                    (top + confirm_h).min(layout.surface.height()),
+                    layout.surface.height(),
                 )
             }
             TableEdge::North => {
-                let bottom = (layout.by - layout.gap).max(Millimeters::default());
+                let bottom = (layout.board.y_unit() - layout.gap).max(Millimeters::default());
                 let confirm_h = bottom.min(layout.zone);
                 (
                     crate::Zone::BtnNorth,
@@ -138,8 +138,17 @@ impl FieldSetBuilder {
             TableEdge::East | TableEdge::West => return Vec::new(),
         };
         vec![
-            Self::field(btn, layout.bx + layout.bs * 0.35, y0, layout.bx + layout.bs * 0.65, y1),
-            Self::field(tray, layout.bx, ty0, layout.bx + layout.bs, ty1),
+            Self::field(
+                btn,
+                rect_mm(
+                    Vec2::from_mm(layout.board.x_unit() + layout.side * 0.35, y0),
+                    Vec2::from_mm(layout.board.x_unit() + layout.side * 0.65, y1),
+                ),
+            ),
+            Self::field(
+                tray,
+                rect_mm(Vec2::from_mm(layout.board.x_unit(), ty0), Vec2::from_mm(layout.board.x_unit() + layout.side, ty1)),
+            ),
         ]
     }
 
@@ -151,35 +160,32 @@ impl FieldSetBuilder {
     fn parking_fields(&self, layout: &Layout) -> Vec<Field> {
         let mut fields = Vec::new();
         for row in 0..crate::CapSide::ROWS {
-            let y0 = layout.by + layout.cell * f64::from(row);
+            let y0 = layout.board.y_unit() + layout.cell * f64::from(row);
             // Shared boundaries must be computed by the same
             // expression as the neighbour's edge - `y0 + cell` rounds
             // differently than `by + cell * (row + 1)` in f64 and can
             // leave a sub-ULP overlap the daemon's disjointness check
             // rejects.
-            let y1 = layout.by + layout.cell * f64::from(row + 1);
-            if layout.bx >= layout.cell {
+            let y1 = layout.board.y_unit() + layout.cell * f64::from(row + 1);
+            if layout.board.x_unit() >= layout.cell {
                 fields.push(Self::field(
                     crate::Zone::Cap {
                         side: crate::CapSide::West,
                         row,
                     },
-                    layout.bx - layout.cell,
-                    y0,
-                    layout.bx,
-                    y1,
+                    rect_mm(Vec2::from_mm(layout.board.x_unit() - layout.cell, y0), Vec2::from_mm(layout.board.x_unit(), y1)),
                 ));
             }
-            if layout.bx + layout.bs + layout.cell <= layout.ww {
+            if layout.board.x_unit() + layout.side + layout.cell <= layout.surface.width() {
                 fields.push(Self::field(
                     crate::Zone::Cap {
                         side: crate::CapSide::East,
                         row,
                     },
-                    layout.bx + layout.bs,
-                    y0,
-                    layout.bx + layout.bs + layout.cell,
-                    y1,
+                    rect_mm(
+                        Vec2::from_mm(layout.board.x_unit() + layout.side, y0),
+                        Vec2::from_mm(layout.board.x_unit() + layout.side + layout.cell, y1),
+                    ),
                 ));
             }
         }
@@ -187,24 +193,9 @@ impl FieldSetBuilder {
     }
 }
 
-/// Derived build geometry (all values screen mm).
-struct Layout {
-    /// Board left edge.
-    bx: Millimeters,
-    /// Board top edge.
-    by: Millimeters,
-    /// Board edge length, clamped to fit the surface.
-    bs: Millimeters,
-    /// One board square's edge length (`bs / 8`).
-    cell: Millimeters,
-    /// Gap between board edge and confirm zone.
-    gap: Millimeters,
-    /// Confirm-zone depth (`cell / 2`).
-    zone: Millimeters,
-    /// Surface width.
-    ww: Millimeters,
-    /// Surface height.
-    wh: Millimeters,
+/// A rectangle in screen mm from its corner coordinates.
+fn rect_mm(min: Vec2<Millimeters>, max: Vec2<Millimeters>) -> Rect<Millimeters> {
+    Rect::new(min, max - min)
 }
 
 #[cfg(test)]
