@@ -637,7 +637,7 @@ fn fill_highlight(cr: &gtk4::cairo::Context, square: Rect<Pixels>, color: Color<
 fn ring_highlight(cr: &gtk4::cairo::Context, square: Rect<Pixels>, color: Color<f64>) {
     color.apply_alpha(cr, 0.85);
     let cell = square.size.x_unit();
-    cr.set_line_width((cell * 0.06).as_f64().max(2.0));
+    cr.set_line_width((cell * 0.06).max(Pixels::new(2.0)).as_f64());
     let ring = square.inset(cell * 0.08);
     cr.rectangle(ring.min.x, ring.min.y, ring.size.x, ring.size.y);
     let _ = cr.stroke();

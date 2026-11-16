@@ -7,6 +7,7 @@ use gtk4::prelude::*;
 use smearor_commons_color::Color;
 use smearor_commons_geometry::Radians;
 use smearor_commons_geometry::RotationRad;
+use smearor_commons_geometry::Segment;
 use smearor_commons_geometry::Vec2;
 use tangibles_chess_config::BoardTheme;
 use tangibles_chess_config::CommitMode;
@@ -328,23 +329,18 @@ fn check_mark(cr: &Context, x: f64, y: f64, size: f64) {
 
 /// A straight arrow from `(x1, y1)` to `(x2, y2)` with a filled head.
 fn arrow(cr: &Context, x1: f64, y1: f64, x2: f64, y2: f64) {
-    let from = Vec2::<()>::new(x1, y1);
-    let tip = Vec2::<()>::new(x2, y2);
-    let shaft = tip - from;
-    let angle = shaft.direction();
-    let head = shaft.magnitude_f64().clamp(6.0, 12.0);
+    let shaft = Segment::new(Vec2::<()>::new(x1, y1), Vec2::<()>::new(x2, y2));
+    let head_len = (shaft.to - shaft.from).magnitude_f64().clamp(6.0, 12.0);
     ACCENT.apply(cr);
     cr.set_line_width(2.0);
-    let base = tip - Vec2::<()>::from_polar(head, angle);
+    let base = shaft.to - Vec2::<()>::from_polar(head_len, shaft.direction());
     cr.move_to(x1, y1);
     cr.line_to(base.x, base.y);
     let _ = cr.stroke();
-    let half_span = RotationRad::from(0.5);
-    let wing_a = tip - Vec2::<()>::from_polar(head, angle - half_span);
-    let wing_b = tip - Vec2::<()>::from_polar(head, angle + half_span);
-    cr.move_to(tip.x, tip.y);
-    cr.line_to(wing_a.x, wing_a.y);
-    cr.line_to(wing_b.x, wing_b.y);
+    let head = shaft.arrow_head(head_len, RotationRad::from(0.5));
+    cr.move_to(head.0[0].x, head.0[0].y);
+    cr.line_to(head.0[1].x, head.0[1].y);
+    cr.line_to(head.0[2].x, head.0[2].y);
     let _ = cr.fill();
 }
 
