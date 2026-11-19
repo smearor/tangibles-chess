@@ -757,7 +757,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01203cb8918f5711e73891b347816d932046f95f54207710bda99beaeb423bf4"
 dependencies = [
- "fluent-langneg",
+ "fluent-langneg 0.13.1",
  "fluent-syntax",
  "intl-memoizer",
  "intl_pluralrules",
@@ -774,6 +774,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eebbe59450baee8282d71676f3bfed5689aeab00b27545e83e5f14b1195e8b0"
 dependencies = [
  "unic-langid",
+]
+
+[[package]]
+name = "fluent-langneg"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d5439a5e4ef14dc761bfe1d6ecbc4ba6fd698814ee65e7e623fa85aa9348dcc"
+dependencies = [
+ "icu_locid",
 ]
 
 [[package]]
@@ -1552,10 +1561,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25d29b57c17c6528d0dc4c2141cfa2d08200465acb537a3909c8b9b8a4a984c0"
 dependencies = [
  "displaydoc",
- "litemap",
- "tinystr",
- "writeable",
+ "litemap 0.8.3",
+ "tinystr 0.8.5",
+ "writeable 0.6.4",
  "zerovec",
+]
+
+[[package]]
+name = "icu_locid"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13acbb8371917fc971be86fc8057c41a64b521c184808a698c02acc242dbf637"
+dependencies = [
+ "displaydoc",
+ "litemap 0.7.5",
+ "tinystr 0.7.6",
+ "writeable 0.5.5",
 ]
 
 [[package]]
@@ -1607,7 +1628,7 @@ checksum = "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514"
 dependencies = [
  "displaydoc",
  "icu_locale_core",
- "writeable",
+ "writeable 0.6.4",
  "yoke",
  "zerofrom",
  "zerotrie",
@@ -1790,6 +1811,12 @@ checksum = "61ff90caf6077a803a240f62fdbe88645a890bbca49ef8174c3cb0404362171d"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "litemap"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "litemap"
@@ -2870,9 +2897,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 
 [[package]]
+name = "smearor-commons-animation"
+version = "0.1.0"
+source = "git+https://github.com/smearor/smearor-commons.git#0cb80f751a1820e2239644f752aaa6edcee04d13"
+dependencies = [
+ "serde",
+ "smearor-commons-geometry",
+]
+
+[[package]]
 name = "smearor-commons-color"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#ed2c1a3a150ac32d770618b02022a2954bd29c6d"
+source = "git+https://github.com/smearor/smearor-commons.git#0cb80f751a1820e2239644f752aaa6edcee04d13"
 dependencies = [
  "cairo-rs",
  "serde",
@@ -2882,10 +2918,21 @@ dependencies = [
 [[package]]
 name = "smearor-commons-geometry"
 version = "0.1.0"
-source = "git+https://github.com/smearor/smearor-commons.git#ed2c1a3a150ac32d770618b02022a2954bd29c6d"
+source = "git+https://github.com/smearor/smearor-commons.git#0cb80f751a1820e2239644f752aaa6edcee04d13"
 dependencies = [
  "gtk4",
  "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "smearor-commons-layout"
+version = "0.1.0"
+source = "git+https://github.com/smearor/smearor-commons.git#0cb80f751a1820e2239644f752aaa6edcee04d13"
+dependencies = [
+ "serde",
+ "smearor-commons-animation",
+ "smearor-commons-geometry",
  "thiserror 2.0.21",
 ]
 
@@ -3051,7 +3098,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-analysis"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#3493d85c8f4d14d5e6d3a1d46eddb833d5e9db24"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#7cc7eac77ccaae7d64d71d9678f2f86b99627aa2"
 dependencies = [
  "serde",
  "serde-jsonlines",
@@ -3064,7 +3111,7 @@ dependencies = [
 [[package]]
 name = "tangible-objects-client"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#3493d85c8f4d14d5e6d3a1d46eddb833d5e9db24"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#7cc7eac77ccaae7d64d71d9678f2f86b99627aa2"
 dependencies = [
  "cynic",
  "futures",
@@ -3086,13 +3133,14 @@ dependencies = [
 [[package]]
 name = "tangible-objects-model"
 version = "0.1.0"
-source = "git+https://github.com/smearor/tangible-objects-rs.git#3493d85c8f4d14d5e6d3a1d46eddb833d5e9db24"
+source = "git+https://github.com/smearor/tangible-objects-rs.git#7cc7eac77ccaae7d64d71d9678f2f86b99627aa2"
 dependencies = [
  "cynic",
  "serde",
  "serde_json",
  "smearor-commons-color",
  "smearor-commons-geometry",
+ "smearor-commons-layout",
  "thiserror 2.0.21",
  "toml 0.8.23",
 ]
@@ -3105,7 +3153,7 @@ dependencies = [
  "cairo-rs",
  "clap",
  "fluent",
- "fluent-langneg",
+ "fluent-langneg 0.14.2",
  "fonts-rs-cuernavaca",
  "gdk4",
  "gio",
@@ -3339,6 +3387,15 @@ dependencies = [
  "minreq",
  "paste",
  "sha256",
+]
+
+[[package]]
+name = "tinystr"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9117f5d4db391c1cf6927e7bea3db74b9a1c1add8f7eda9ffd5364f40f57b82f"
+dependencies = [
+ "displaydoc",
 ]
 
 [[package]]
@@ -3686,7 +3743,7 @@ version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dce1bf08044d4b7a94028c93786f8566047edc11110595914de93362559bc658"
 dependencies = [
- "tinystr",
+ "tinystr 0.8.5",
 ]
 
 [[package]]
@@ -4074,6 +4131,12 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "writeable"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
 
 [[package]]
 name = "writeable"
